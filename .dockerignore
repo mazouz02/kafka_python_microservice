@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python virtual environment
+.venv
+venv/
+env/
+*.pyc
+__pycache__/
+
+# IDE / OS specific
+.idea/
+.vscode/
+*.DS_Store
+
+# Docker
+Dockerfile
+# case_management_service/Dockerfile # if Dockerfile is inside the service dir, it should be ignored by outer context
+# but for this task, Dockerfile is inside case_management_service, and context is its parent.
+# So, if build context is '.', then case_management_service/Dockerfile is part of source.
+# If build context is 'case_management_service', then Dockerfile at its root is fine.
+# The COPY ./case_management_service implies context is parent of case_management_service.
+# So, case_management_service/Dockerfile will be copied.
+# If we want to ignore the source Dockerfile from context if another one is at root:
+# case_management_service/Dockerfile
+
+.dockerignore
+
+# Local development files
+.env
+*.env
+*.env.*
+!*.env.example # Keep example env files if any
+
+# Test outputs
+.pytest_cache/
+.coverage
+htmlcov/
+*.log # General log files
+*.sqlite3 # SQLite databases
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

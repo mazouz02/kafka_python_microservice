@@ -1,4 +1,4 @@
-# case_management_service/app/kafka_models.py
+# Pydantic models for Kafka message structures
 from pydantic import BaseModel, validator
 from typing import List, Optional
 
@@ -15,6 +15,6 @@ class KafkaMessage(BaseModel):
 
     @validator('version')
     def version_must_be_valid(cls, v):
-        if v != "1.0":
+        if v != "1.0": # Example validation
             raise ValueError('Version must be 1.0')
         return v
