@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-management-api
+  namespace: default # Or your target namespace
+  labels:
+    app: case-management
+    component: api
+spec:
+  replicas: 2 # Example replica count
+  selector:
+    matchLabels:
+      app: case-management
+      component: api
+  template:
+    metadata:
+      labels:
+        app: case-management
+        component: api
+    spec:
+      containers:
+      - name: api-container
+        image: your-docker-registry/case-management-service:latest # Replace with your image name/tag
+        imagePullPolicy: Always # Or IfNotPresent
+        command: ["/usr/src/app/startup.sh", "api"]
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: case-management-config # Load all data from ConfigMap as env vars
+        env: # Specific environment variables or overrides
+        - name: SERVICE_NAME_API # From AppSettings, but can be set here for K8s context
+          value: "case-api-k8s"
+        # Add readiness and liveness probes
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources: # Optional: Define resource requests and limits
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"

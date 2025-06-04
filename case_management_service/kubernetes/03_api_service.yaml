@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-management-api-service
+  namespace: default # Or your target namespace
+  labels:
+    app: case-management
+    component: api
+spec:
+  type: ClusterIP # Or LoadBalancer/NodePort depending on how you want to expose it
+  selector:
+    app: case-management
+    component: api
+  ports:
+  - protocol: TCP
+    port: 80 # Port the service will listen on
+    targetPort: 8000 # Port the container (Uvicorn) is listening on

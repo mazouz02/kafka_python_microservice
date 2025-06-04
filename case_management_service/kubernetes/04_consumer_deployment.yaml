@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-management-consumer
+  namespace: default
+  labels:
+    app: case-management
+    component: consumer
+spec:
+  replicas: 1 # Or more, if your consumer logic supports multiple instances for the same group
+  selector:
+    matchLabels:
+      app: case-management
+      component: consumer
+  template:
+    metadata:
+      labels:
+        app: case-management
+        component: consumer
+    spec:
+      containers:
+      - name: consumer-container
+        image: your-docker-registry/case-management-service:latest # Uses the same image
+        imagePullPolicy: Always
+        command: ["/usr/src/app/startup.sh", "consumer"]
+        envFrom:
+        - configMapRef:
+            name: case-management-config
+        env:
+        - name: SERVICE_NAME_CONSUMER
+          value: "case-consumer-k8s"
+        # No ports exposed typically for a consumer unless it has a health/metrics endpoint itself
+        # Add liveness/readiness probes if the consumer has a way to report health
+        # (e.g., a small HTTP server, or command-based probe)
+        # For now, omitting probes for simplicity for the consumer.
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"

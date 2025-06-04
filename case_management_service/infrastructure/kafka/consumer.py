@@ -3,7 +3,7 @@ import asyncio
 import json
 import logging
 import os
-import time
+import time # Keep time import for latency
 
 from confluent_kafka import Consumer, KafkaError, KafkaException, Message
 
@@ -12,10 +12,17 @@ from opentelemetry.trace.status import StatusCode, Status
 
 # Corrected imports based on new structure
 from case_management_service.app.config import settings
-from .schemas import KafkaMessage # Relative import for schemas within the same module (infrastructure/kafka)
+from .schemas import KafkaMessage
 from case_management_service.core.commands.models import CreateCaseCommand
 from case_management_service.core.commands.handlers import handle_create_case_command
-from case_management_service.app.observability import tracer, kafka_messages_consumed_counter, extract_trace_context_from_kafka_headers, setup_opentelemetry
+# Import the new histogram along with other observability components
+from case_management_service.app.observability import (
+    tracer,
+    kafka_messages_consumed_counter,
+    case_creation_latency_histogram, # Added histogram
+    extract_trace_context_from_kafka_headers,
+    setup_opentelemetry
+)
 from case_management_service.infrastructure.database.raw_event_store import add_raw_event_to_store
 from case_management_service.infrastructure.database.connection import connect_to_mongo, close_mongo_connection
 
@@ -23,6 +30,7 @@ from case_management_service.infrastructure.database.connection import connect_t
 logger = logging.getLogger(__name__)
 
 async def dispatch_command(validated_message: KafkaMessage):
+    start_time = time.monotonic() # For latency calculation
     with tracer.start_as_current_span("dispatch_command_from_kafka", kind=SpanKind.INTERNAL) as cmd_span:
         cmd_span.set_attribute("messaging.system", "kafka")
         cmd_span.set_attribute("case.client_id", validated_message.client_id)
@@ -34,16 +42,20 @@ async def dispatch_command(validated_message: KafkaMessage):
             persons=[person for person in validated_message.persons]
         )
         cmd_span.add_event("CommandCreatedFromKafkaMessage", {"command.id": create_case_cmd.command_id, "command.type": "CreateCaseCommand"})
+
         case_id = await handle_create_case_command(create_case_cmd)
 
+        latency = time.monotonic() - start_time
+        if hasattr(case_creation_latency_histogram, "record"):
+            case_creation_latency_histogram.record(latency, attributes={"command.type": "CreateCaseCommand", "success": "true"})
+
         cmd_span.set_attribute("case.id", case_id)
-        cmd_span.add_event("CommandHandlerInvoked", {"case.id": case_id})
-        logger.info(f"Command {create_case_cmd.command_id} (for client {validated_message.client_id}) dispatched, resulted in case_id: {case_id}")
+        cmd_span.add_event("CommandHandlerInvoked", {"case.id": case_id, "latency_seconds": latency})
+        logger.info(f"Command {create_case_cmd.command_id} (for client {validated_message.client_id}) dispatched, resulted in case_id: {case_id}. Latency: {latency:.4f}s")
 
 
 def consume_kafka_events():
     logger.info("Initializing Kafka consumer...")
-    # Use settings for Kafka configuration
     conf = {
         'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVERS,
         'group.id': settings.KAFKA_CONSUMER_GROUP_ID,
@@ -96,7 +108,6 @@ def consume_kafka_events():
                     message_data = json.loads(message_data_str)
                     consume_span.add_event("MessageDecodedSuccessfully")
 
-                    # Use add_raw_event_to_store (already corrected in previous step's content)
                     raw_event_persisted = asyncio.run(add_raw_event_to_store(message_data, event_type="KAFKA_MESSAGE_RAW_STORED"))
                     consume_span.add_event("RawMessageStored", {"raw_event.id": raw_event_persisted.id})
 
@@ -113,7 +124,7 @@ def consume_kafka_events():
                 except json.JSONDecodeError as e:
                     logger.error(f"JSON Decode Error for message at {msg_topic}/{msg_partition}/{msg_offset}: {e}", exc_info=True)
                     consume_span.record_exception(e)
-                    consume_span.set_status(Status(StatusCode.ERROR, description=f"JSON Decode Error: {e}"))
+                    consume_span.set_status(Status(StatusCode.ERROR, description=f"JSON Decode Error: {type(e).__name__}")) # Use type for brevity
                     consumer.commit(message=msg, asynchronous=False)
                 except Exception as e:
                     logger.error(f"Error processing message at {msg_topic}/{msg_partition}/{msg_offset}: {e}", exc_info=True)
