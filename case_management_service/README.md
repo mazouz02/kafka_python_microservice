@@ -186,6 +186,146 @@ NOTIFICATION_KAFKA_TOPIC="notification_events_local"
     pytest case_management_service/tests/
     ```
 
+## Testing Implemented Features
+
+Beyond running the automated unit tests, each major feature can be tested more specifically, often involving end-to-end flows.
+
+### 1. Core Case/Person Ingestion (KYC)
+
+*   **Unit Tests:**
+    *   Kafka message validation: `tests/infrastructure/kafka/test_kafka_schemas.py` (focus on KYC structure).
+    *   Command handling for KYC: `tests/core/commands/test_command_handlers.py` (e.g., `test_handle_create_case_command_kyc_only_person`).
+    *   Event projection for KYC: `tests/core/events/test_event_projectors.py` (e.g., `test_project_case_created`, `test_project_person_added_to_case_kyc`).
+    *   API for KYC cases: `tests/app/test_api.py` (querying cases and persons).
+*   **End-to-End Testing (Conceptual):**
+    1.  Ensure Docker Compose services are running (`docker-compose up`).
+    2.  Produce a Kafka message to the configured topic (e.g., `kyc_events_docker`) with `traitement_type: "KYC"` and relevant `persons` data.
+        *Example Minimal KYC Kafka Message Payload (JSON):*
+        ```json
+        {
+          "client_id": "kyc-client-001",
+          "version": "1.0",
+          "type": "INDIVIDUAL_STANDARD",
+          "traitement_type": "KYC",
+          "persons": [
+            { "firstname": "John", "lastname": "Doe", "birthdate": "1990-01-15" }
+          ]
+        }
+        ```
+    3.  **Verify:**
+        *   Logs from `case-management-consumer` for successful message processing.
+        *   **API:** Use Swagger UI (`/docs`) or curl to query:
+            *   `GET /api/v1/cases/{generated_case_id}`
+            *   `GET /api/v1/persons/case/{generated_case_id}`
+        *   **Database:** Check MongoDB collections:
+            *   `domain_events`: Look for `CaseCreatedEvent`, `PersonAddedToCaseEvent`.
+            *   `cases`: Verify the case read model.
+            *   `persons`: Verify the person read model.
+
+### 2. Company & Beneficial Owner Modeling (KYB)
+
+*   **Unit Tests:**
+    *   Kafka message validation for KYB: `tests/infrastructure/kafka/test_kafka_schemas.py`.
+    *   Command handling for KYB: `tests/core/commands/test_command_handlers.py` (e.g., `test_handle_create_case_command_kyb_with_company_and_bos_and_persons`).
+    *   Event projection for KYB: `tests/core/events/test_event_projectors.py` (e.g., `project_company_profile_created`, `project_beneficial_owner_added`, `project_person_linked_to_company`).
+*   **End-to-End Testing (Conceptual):**
+    1.  Ensure Docker Compose services are running.
+    2.  Produce a Kafka message to the configured topic with `traitement_type: "KYB"`, `company_profile` data, `persons` (with roles), and `beneficial_owners` data.
+        *Example Minimal KYB Kafka Message Payload (JSON):*
+        ```json
+        {
+          "client_id": "kyb-client-002",
+          "version": "1.0",
+          "type": "COMPANY_STANDARD",
+          "traitement_type": "KYB",
+          "company_profile": {
+            "registered_name": "Test Corp Ltd",
+            "registration_number": "C09876",
+            "country_of_incorporation": "GB",
+            "registered_address": { "street": "1 Business Park", "city": "London", "country": "GB", "postal_code": "E14 5HQ" }
+          },
+          "persons": [
+            { "firstname": "Jane", "lastname": "Director", "birthdate": "1985-03-20", "role_in_company": "Director" }
+          ],
+          "beneficial_owners": [
+            {
+              "person_details": { "firstname": "Ultimate", "lastname": "Owner", "birthdate": "1975-11-10" },
+              "ownership_percentage": 75,
+              "types_of_control": ["SHAREHOLDING_OVER_25"],
+              "is_ubo": true
+            }
+          ]
+        }
+        ```
+    3.  **Verify:**
+        *   Logs from `case-management-consumer`.
+        *   **API:** Query relevant case data. (Future: specific company/BO endpoints).
+        *   **Database:** Check MongoDB collections:
+            *   `domain_events`: Look for `CompanyProfileCreatedEvent`, `BeneficialOwnerAddedEvent`, `PersonLinkedToCompanyEvent`.
+            *   `cases`: Verify the case links to the company.
+            *   `companies`: Verify the company profile read model.
+            *   `persons`: Verify linked persons (director) with roles.
+            *   `beneficial_owners`: Verify BO read models.
+
+### 3. Awaiting Documents System
+
+*   **Unit Tests:**
+    *   Database operations for documents: `tests/infrastructure/database/test_database.py` (e.g., `test_add_required_document`).
+    *   Command handling for documents: `tests/core/commands/test_command_handlers.py` (e.g., `test_handle_determine_initial_document_requirements_person_kyc`, `test_handle_update_document_status_success`).
+    *   Event projection for documents: `tests/core/events/test_event_projectors.py` (e.g., `test_project_document_requirement_determined`).
+    *   API for documents: `tests/app/test_api.py` (e.g., `test_determine_document_requirements_api`).
+*   **End-to-End Testing (Conceptual):**
+    1.  Create a case (KYC or KYB) via Kafka as described above.
+    2.  **Determine Requirements:** Call `POST /api/v1/documents/determine-requirements` with the `case_id`, `entity_id` (person or company ID from the created case), `entity_type`, `traitement_type`, and `case_type`.
+        *Example Request Body for `determine-requirements` (JSON):*
+        ```json
+        {
+          "case_id": "<your_case_id>",
+          "entity_id": "<your_person_or_company_id>",
+          "entity_type": "PERSON",
+          "traitement_type": "KYC",
+          "case_type": "INDIVIDUAL_STANDARD"
+        }
+        ```
+    3.  **Verify Determination:**
+        *   API: Call `GET /api/v1/documents/case/{case_id}` (using the path updated in router for listing by case) to see the list of required documents and their initial "AWAITING_UPLOAD" status.
+        *   Database: Check the `document_requirements` collection.
+    4.  **Update Status:** Call `PUT /api/v1/documents/{document_requirement_id}/status` for one of the generated document requirements.
+        *Example Request Body for updating status (JSON):*
+        ```json
+        {
+          "new_status": "UPLOADED",
+          "updated_by_actor_id": "test_user",
+          "metadata_changes": { "file_reference": "doc_xyz.pdf" }
+        }
+        ```
+    5.  **Verify Update:**
+        *   API: Call `GET /api/v1/documents/{document_requirement_id}` to check the updated status and metadata.
+        *   Database: Check the updated record in `document_requirements`.
+
+### 4. Configurable Notifications on Case Creation
+
+*   **Unit Tests:**
+    *   Configuration service client: `tests/infrastructure/test_config_service_client.py`.
+    *   Kafka producer: `tests/infrastructure/kafka/test_kafka_producer.py`.
+    *   Command handler logic for notifications: In `tests/core/commands/test_command_handlers.py` (e.g., `test_handle_create_case_command_kyb_sends_notification_if_configured`).
+*   **End-to-End Testing (Conceptual - requires external setup):**
+    1.  **Set up a mock Configuration Service:** This service should respond to POST requests at the URL specified in `CONFIG_SERVICE_URL` (e.g., `http://localhost:8081/api/v1/notification-rules/rules/match`). It should return a JSON `NotificationRule` when a matching trigger/context is sent.
+        *Example Mock Config Service Response (JSON for a specific trigger):*
+        ```json
+        [{ "rule_id": "welcome_email_rule", "is_active": true, "notification_type": "EMAIL_WELCOME_KYC", "template_id": "KYC_WELCOME_EMAIL_V1" }]
+        ```
+    2.  **Set up a Kafka Consumer:** Use a generic Kafka consumer tool (e.g., `kcat`, or a simple Python script) to listen to the topic defined by `NOTIFICATION_KAFKA_TOPIC` (e.g., `notification_events_docker`).
+    3.  Ensure Docker Compose services are running, and the `CONFIG_SERVICE_URL` environment variable for `case-management-api` and `case-management-consumer` points to your mock config service.
+    4.  Produce a Kafka message (KYC or KYB) to create a new case.
+    5.  **Verify:**
+        *   Logs from `case-management-consumer` should indicate it called the config service.
+        *   If a rule matched, logs should show a `NotificationRequiredEvent` being prepared and published.
+        *   Your external Kafka consumer listening to the notification topic should receive the `NotificationRequiredEvent` message.
+        *   Database: Check `domain_events` for the stored `NotificationRequiredEvent`.
+
+This detailed testing guidance should help users verify each feature thoroughly.
+
 ## Observability
 
 *   **Structured Logging**: Logs are in JSON format and include OpenTelemetry trace and span IDs (`otelTraceID`, `otelSpanID`) when a trace is active, allowing for easier log aggregation and correlation.
