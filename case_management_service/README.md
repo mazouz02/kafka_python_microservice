@@ -36,6 +36,15 @@ The project is organized into a modular structure to clearly separate concerns a
 *   `README.md`: This file.
 *   `requirements.txt`: Python dependencies.
 
+## Key Domain Entities
+
+The service primarily deals with the following domain concepts, especially after the introduction of KYB features:
+
+*   **Case**: Represents a KYC or KYB onboarding instance, identified by a unique `case_id`. It includes a `traitement_type` (KYC/KYB).
+*   **Person**: Represents an individual involved in a case, such as a primary KYC subject or a person linked to a company (e.g., director, contact). Stored with a unique `person_id`.
+*   **Company Profile**: For KYB cases, this stores detailed information about a legal entity, identified by a unique `company_id`. The Case can be linked to this Company Profile.
+*   **Beneficial Owner (BO)**: Represents a beneficial owner of a company, identified by a unique `beneficial_owner_id` and linked to a `company_id`. Includes details of the person and their ownership/control.
+
 ## Prerequisites
 
 *   Python 3.9 or higher.

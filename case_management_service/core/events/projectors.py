@@ -1,38 +1,95 @@
 # Event Projectors and Dispatcher
 import logging
-import datetime # For updated_at timestamp if not handled by upsert directly
+import datetime # Ensure datetime is imported for projectors
 
-# Corrected imports
-from . import models as domain_event_models # Relative import for domain event models
+# Corrected imports for refactored structure
+from . import models as domain_event_models
 from case_management_service.infrastructure.database import schemas as db_schemas
 from case_management_service.infrastructure.database import read_models as read_model_ops
-# get_database is not directly used here if read_model_ops encapsulate all DB interactions for projectors.
-# from case_management_service.infrastructure.database.connection import get_database
 from case_management_service.app.observability import tracer, domain_events_processed_counter, domain_events_by_type_counter
 
 from opentelemetry.trace import SpanKind, get_current_span
 from opentelemetry.trace.status import StatusCode, Status
 
-
 logger = logging.getLogger(__name__)
 
 # --- Specific Projector Functions ---
+
+# Modified project_case_created
 async def project_case_created(event: domain_event_models.CaseCreatedEvent):
     logger.info(f"Projecting CaseCreatedEvent: {event.event_id} for aggregate {event.aggregate_id}")
 
     case_data_for_read_model = db_schemas.CaseManagementDB(
-        id=event.aggregate_id,
+        id=event.aggregate_id, # This is case_id
         client_id=event.payload.client_id,
         version=event.payload.case_version,
         type=event.payload.case_type,
+        traitement_type=event.payload.traitement_type, # New field
+        company_id=event.payload.company_id,       # New field (link to company)
+        status="OPEN", # Default status
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-
     await read_model_ops.upsert_case_read_model(case_data_for_read_model)
     logger.info(f"Case read model CREATED/UPDATED for ID: {event.aggregate_id} via projector.")
 
+# New projector for CompanyProfileCreatedEvent
+async def project_company_profile_created(event: domain_event_models.CompanyProfileCreatedEvent):
+    logger.info(f"Projecting CompanyProfileCreatedEvent: {event.event_id} for company {event.aggregate_id}")
 
+    company_data_for_read_model = db_schemas.CompanyProfileDB(
+        id=event.aggregate_id, # This is company_id
+        registered_name=event.payload.registered_name,
+        trading_name=event.payload.trading_name,
+        registration_number=event.payload.registration_number,
+        registration_date=event.payload.registration_date,
+        country_of_incorporation=event.payload.country_of_incorporation,
+        registered_address=event.payload.registered_address,
+        business_type=event.payload.business_type,
+        industry_sector=event.payload.industry_sector,
+        created_at=event.timestamp,
+        updated_at=event.timestamp
+    )
+    await read_model_ops.upsert_company_read_model(company_data_for_read_model)
+    logger.info(f"CompanyProfile read model CREATED/UPDATED for ID: {event.aggregate_id} via projector.")
+
+# New projector for BeneficialOwnerAddedEvent
+async def project_beneficial_owner_added(event: domain_event_models.BeneficialOwnerAddedEvent):
+    logger.info(f"Projecting BeneficialOwnerAddedEvent: {event.event_id} for company {event.aggregate_id}")
+
+    bo_data_for_read_model = db_schemas.BeneficialOwnerDB(
+        id=event.payload.beneficial_owner_id,
+        company_id=event.aggregate_id,
+        firstname=event.payload.person_details.firstname,
+        lastname=event.payload.person_details.lastname,
+        birthdate=event.payload.person_details.birthdate,
+        ownership_percentage=event.payload.ownership_percentage,
+        types_of_control=event.payload.types_of_control,
+        is_ubo=event.payload.is_ubo,
+        created_at=event.timestamp,
+        updated_at=event.timestamp
+    )
+    await read_model_ops.upsert_beneficial_owner_read_model(bo_data_for_read_model)
+    logger.info(f"BeneficialOwner read model CREATED/UPDATED for ID: {event.payload.beneficial_owner_id} in company {event.aggregate_id}.")
+
+# New projector for PersonLinkedToCompanyEvent
+async def project_person_linked_to_company(event: domain_event_models.PersonLinkedToCompanyEvent):
+    logger.info(f"Projecting PersonLinkedToCompanyEvent: {event.event_id} for company {event.aggregate_id}")
+
+    person_data_for_read_model = db_schemas.PersonDB(
+        id=event.payload.person_id,
+        company_id=event.aggregate_id,
+        firstname=event.payload.firstname,
+        lastname=event.payload.lastname,
+        birthdate=event.payload.birthdate,
+        role_in_company=event.payload.role_in_company,
+        created_at=event.timestamp,
+        updated_at=event.timestamp
+    )
+    await read_model_ops.upsert_person_read_model(person_data_for_read_model)
+    logger.info(f"Person read model CREATED/UPDATED for ID: {event.payload.person_id} linked to company {event.aggregate_id} with role {event.payload.role_in_company}.")
+
+# Modified project_person_added_to_case (for KYC pure person cases)
 async def project_person_added_to_case(event: domain_event_models.PersonAddedToCaseEvent):
     logger.info(f"Projecting PersonAddedToCaseEvent: {event.event_id} for case {event.aggregate_id}")
 
@@ -45,37 +102,35 @@ async def project_person_added_to_case(event: domain_event_models.PersonAddedToC
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-
     await read_model_ops.upsert_person_read_model(person_data_for_read_model)
-    logger.info(f"Person read model CREATED/UPDATED for ID: {event.payload.person_id} in case {event.aggregate_id} via projector.")
+    logger.info(f"Person read model CREATED/UPDATED for ID: {event.payload.person_id} in case {event.aggregate_id}.")
 
-
-# --- Event Dispatcher ---
+# --- Event Dispatcher (Update EVENT_PROJECTORS map) ---
 EVENT_PROJECTORS = {
     "CaseCreated": [project_case_created],
     "PersonAddedToCase": [project_person_added_to_case],
+    "CompanyProfileCreated": [project_company_profile_created],
+    "BeneficialOwnerAdded": [project_beneficial_owner_added],
+    "PersonLinkedToCompany": [project_person_linked_to_company],
 }
 
+# Wrapper for tracing and metrics (remains the same)
 async def project_event_with_tracing_and_metrics(projector_func, event: domain_event_models.BaseEvent):
-    event_type_str = event.event_type if isinstance(event.event_type, str) else type(event.event_type).__name__
-
+    event_type_str = event.event_type
     with tracer.start_as_current_span(f"projector.{event_type_str}.{projector_func.__name__}", kind=SpanKind.INTERNAL) as proj_span:
         proj_span.set_attribute("event.id", event.event_id)
         proj_span.set_attribute("event.type", event_type_str)
         proj_span.set_attribute("aggregate.id", event.aggregate_id)
         proj_span.set_attribute("projector.function", projector_func.__name__)
-
         logger.debug(f"Projector {projector_func.__name__} starting for event {event.event_id}")
         try:
             await projector_func(event)
-
             if hasattr(domain_events_processed_counter, 'add'):
                  domain_events_processed_counter.add(1, {"projector.name": projector_func.__name__})
             if hasattr(domain_events_by_type_counter, 'add'):
                  domain_events_by_type_counter.add(1, {"event.type": event_type_str, "projector.name": projector_func.__name__})
-
             proj_span.set_status(Status(StatusCode.OK))
-            logger.debug(f"Projector {projector_func.__name__} completed for event {event.event_id}")
+            logger.debug(f"Projector {projector_func.__name__} completed for event {event.event_id}") # Corrected closing quote
         except Exception as e:
             logger.error(f"Error in projector {projector_func.__name__} for event {event.event_id}: {e}", exc_info=True)
             proj_span.record_exception(e)
@@ -84,12 +139,11 @@ async def project_event_with_tracing_and_metrics(projector_func, event: domain_e
 
 async def dispatch_event_to_projectors(event: domain_event_models.BaseEvent):
     current_span = get_current_span()
-    event_type_str = event.event_type if isinstance(event.event_type, str) else type(event.event_type).__name__
+    event_type_str = event.event_type
     current_span.add_event("DispatchingToProjectors", {"event.type": event_type_str, "event.id": event.event_id})
-
     logger.debug(f"Dispatching event: {event_type_str} (ID: {event.event_id}) to projectors.")
 
-    projector_functions_for_event_type = EVENT_PROJECTORS.get(event_type_str)
+    projector_functions_for_event_type = EVENT_PROJECTORS.get(event.event_type)
 
     if projector_functions_for_event_type:
         for projector_func in projector_functions_for_event_type:

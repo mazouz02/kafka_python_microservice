@@ -3,9 +3,9 @@ import logging
 import datetime
 from typing import List, Optional
 
-# Corrected imports
+# Corrected imports: Add CompanyProfileDB and BeneficialOwnerDB
 from .connection import get_database
-from .schemas import CaseManagementDB, PersonDB
+from .schemas import CaseManagementDB, PersonDB, CompanyProfileDB, BeneficialOwnerDB # Added new schemas
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +55,31 @@ async def list_persons_for_case_from_read_model(case_id: str, limit: int = 10, s
     persons_cursor = db.persons.find({"case_id": case_id}).limit(limit).skip(skip).sort("created_at", 1)
     persons_docs = await persons_cursor.to_list(length=limit)
     return [PersonDB(**doc) for doc in persons_docs]
+
+async def upsert_company_read_model(company_data: CompanyProfileDB) -> CompanyProfileDB:
+    """Creates or updates a company document in the read model (companies collection)."""
+    db = await get_database()
+    company_dict = company_data.model_dump()
+    company_dict["updated_at"] = datetime.datetime.utcnow() # Ensure updated_at is fresh
+
+    await db.companies.replace_one(
+        {"id": company_data.id}, # Filter by company_id
+        company_dict,
+        upsert=True
+    )
+    logger.info(f"Company read model upserted for ID: {company_data.id}")
+    return company_data
+
+async def upsert_beneficial_owner_read_model(bo_data: BeneficialOwnerDB) -> BeneficialOwnerDB:
+    """Creates or updates a beneficial owner document in the read model (beneficial_owners collection)."""
+    db = await get_database()
+    bo_dict = bo_data.model_dump()
+    bo_dict["updated_at"] = datetime.datetime.utcnow()
+
+    await db.beneficial_owners.replace_one(
+        {"id": bo_data.id}, # Filter by bo_id
+        bo_dict,
+        upsert=True
+    )
+    logger.info(f"Beneficial Owner read model upserted for ID: {bo_data.id}")
+    return bo_data
