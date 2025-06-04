@@ -21,7 +21,7 @@ from case_management_service.app.api.routers import health as health_router
 from case_management_service.app.api.routers import cases as cases_router
 from case_management_service.app.api.routers import persons as persons_router
 from case_management_service.app.api.routers import raw_events as raw_events_router
-
+from case_management_service.app.api.routers import documents as documents_router # Added documents_router
 
 # --- FastAPI Application Instance ---
 app = FastAPI(
@@ -54,10 +54,11 @@ FastAPIInstrumentor.instrument_app(app)
 logger.info("FastAPI instrumentation complete.")
 
 # Include API Routers
-app.include_router(health_router.router) # No prefix, direct /health
-app.include_router(raw_events_router.router, prefix="/api/v1") # Example prefix, tags are in router file
+app.include_router(health_router.router)
+app.include_router(raw_events_router.router, prefix="/api/v1")
 app.include_router(cases_router.router, prefix="/api/v1")
 app.include_router(persons_router.router, prefix="/api/v1")
+app.include_router(documents_router.router, prefix="/api/v1/documents", tags=["Document Requirements"]) # Added documents_router
 
 logger.info("API routers included. Application setup complete.")
 

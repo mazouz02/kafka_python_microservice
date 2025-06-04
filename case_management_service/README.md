@@ -19,7 +19,7 @@ The project is organized into a modular structure to clearly separate concerns a
 
 *   `case_management_service/`: Root directory for the microservice.
     *   `app/`: Contains the FastAPI application setup, API routers, configuration, and observability initialization.
-        *   `api/routers/`: Houses individual FastAPI routers for different API resources (e.g., cases, persons, health).
+        *   `api/routers/`: Houses individual FastAPI routers for different API resources (e.g., cases, persons, health, documents).
         *   `config.py`: Manages application settings using Pydantic's `BaseSettings`.
         *   `main.py`: The main FastAPI application entry point, including router aggregation.
         *   `observability.py`: Configures logging and OpenTelemetry.
@@ -27,12 +27,12 @@ The project is organized into a modular structure to clearly separate concerns a
         *   `commands/`: Defines command models and their handlers.
         *   `events/`: Defines domain event models and event projectors (which update read models).
     *   `infrastructure/`: Manages interactions with external systems like databases and message brokers.
-        *   `database/`: Handles MongoDB connections, event store operations, read model queries/updates, and database schemas.
+        *   `database/`: Handles MongoDB connections, event store operations, read model queries/updates, document requirement storage, and database schemas.
         *   `kafka/`: Contains Kafka consumer setup, message polling, and Kafka message schemas.
     *   `tests/`: Contains unit tests, mirroring the source code structure.
     *   `Dockerfile`: Defines the Docker image for the service.
 *   `docker-compose.yml`: (In project root) Orchestrates local deployment of the service and its dependencies (Kafka, MongoDB).
-*   `.env.example`: (Should be created) Example environment file.
+*   `.env.example`: (In project root) Example environment file.
 *   `README.md`: This file.
 *   `requirements.txt`: Python dependencies.
 
@@ -44,6 +44,7 @@ The service primarily deals with the following domain concepts, especially after
 *   **Person**: Represents an individual involved in a case, such as a primary KYC subject or a person linked to a company (e.g., director, contact). Stored with a unique `person_id`.
 *   **Company Profile**: For KYB cases, this stores detailed information about a legal entity, identified by a unique `company_id`. The Case can be linked to this Company Profile.
 *   **Beneficial Owner (BO)**: Represents a beneficial owner of a company, identified by a unique `beneficial_owner_id` and linked to a `company_id`. Includes details of the person and their ownership/control.
+*   **Required Document**: Represents a document that needs to be collected for a specific entity (Person or Company) within a Case. Tracks type, status (e.g., AWAITING_UPLOAD, VERIFIED), and other metadata.
 
 ## Prerequisites
 
@@ -126,6 +127,18 @@ SERVICE_NAME_CONSUMER="case-consumer-local"
     *   API Base: `http://localhost:8000`
     *   Swagger UI / OpenAPI Docs: `http://localhost:8000/docs`
     *   ReDoc: `http://localhost:8000/redoc`
+
+#### Notable Endpoint Groups (under `/api/v1/` prefix via Docker Compose):
+*   `/health`: System health check (no prefix).
+*   `/events/raw`: For listing raw ingested events.
+*   `/cases`: For querying case read models.
+*   `/persons`: For querying person read models linked to cases.
+*   `/documents`: For managing and querying document requirements:
+    *   `POST /documents/determine-requirements`: To trigger the determination of required documents for an entity within a case.
+    *   `PUT /documents/{document_requirement_id}/status`: To update the status of a specific document requirement.
+    *   `GET /documents/{document_requirement_id}`: To retrieve details of a specific document requirement.
+    *   `GET /documents/case/{case_id}`: To list document requirements for a specific case (path updated from `/entity/{entity_id}` for clarity).
+
 
 3.  **Viewing Logs:**
     To view logs from the services:
