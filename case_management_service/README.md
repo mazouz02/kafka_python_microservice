@@ -1,6 +1,7 @@
 # Case Management Microservice
 
-This project implements a Case Management microservice using Python, FastAPI, Kafka, MongoDB, and OpenTelemetry. It follows a CQRS and Event Sourcing architectural pattern to handle events, process commands, and maintain read models.
+This project implements a Case Management microservice using Python, FastAPI, Kafka, MongoDB, and OpenTelemetry. Key features include initial case and KYB data ingestion (companies, beneficial owners), management of document requirements, and a configurable system to trigger notifications (e.g., on case creation) by publishing events to Kafka for consumption by other microservices.
+It follows a CQRS and Event Sourcing architectural pattern to handle events, process commands, and maintain read models.
 
 ## Key Technologies
 
@@ -28,7 +29,7 @@ The project is organized into a modular structure to clearly separate concerns a
         *   `events/`: Defines domain event models and event projectors (which update read models).
     *   `infrastructure/`: Manages interactions with external systems like databases and message brokers.
         *   `database/`: Handles MongoDB connections, event store operations, read model queries/updates, document requirement storage, and database schemas.
-        *   `kafka/`: Contains Kafka consumer setup, message polling, and Kafka message schemas.
+        *   `kafka/`: Contains Kafka consumer setup, message polling, Kafka message schemas, and a Kafka producer utility.
     *   `tests/`: Contains unit tests, mirroring the source code structure.
     *   `Dockerfile`: Defines the Docker image for the service.
 *   `docker-compose.yml`: (In project root) Orchestrates local deployment of the service and its dependencies (Kafka, MongoDB).
@@ -92,7 +93,7 @@ DB_NAME="case_management_db_local"
 # Kafka
 KAFKA_BOOTSTRAP_SERVERS="localhost:29092" # For local run outside Docker (external port)
 # KAFKA_BOOTSTRAP_SERVERS="kafka:9092" # For Docker Compose internal communication
-KAFKA_TOPIC_NAME="kyc_events_local"
+KAFKA_TOPIC_NAME="kyc_events_local" # Main topic for case events
 KAFKA_CONSUMER_GROUP_ID="case_management_group_local"
 
 # Observability
@@ -101,6 +102,12 @@ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT= # e.g., http://localhost:4317
 OTEL_EXPORTER_OTLP_METRICS_ENDPOINT= # e.g., http://localhost:4317
 SERVICE_NAME_API="case-api-local"
 SERVICE_NAME_CONSUMER="case-consumer-local"
+
+# Configuration Service for Notifications (Optional)
+CONFIG_SERVICE_URL= # e.g., http://localhost:8081/api/v1/notification-rules
+
+# Kafka Topic for Outbound Notification Events
+NOTIFICATION_KAFKA_TOPIC="notification_events_local"
 ```
 
 **Note on Docker Compose:** The `docker-compose.yml` file sets these environment variables for the services running within Docker, often pointing to Docker network hostnames (e.g., `mongo`, `kafka`). The `.env` file is primarily for running the Python application directly on your host machine (outside Docker) for development or testing, or it can be used by Docker Compose if configured.
@@ -151,7 +158,7 @@ SERVICE_NAME_CONSUMER="case-consumer-local"
     Use `Ctrl+C` to stop tailing logs.
 
 4.  **Kafka Topic (`kyc_events_docker`):**
-    The Kafka topic specified in `docker-compose.yml` (`KAFKA_TOPIC_NAME=kyc_events_docker`) should be auto-created by the Confluent Kafka image when the consumer or a producer first attempts to access it. If not, you might need to create it manually using Kafka tools (e.g., by exec-ing into the Kafka container).
+    The Kafka topic specified in `docker-compose.yml` (`KAFKA_TOPIC_NAME=kyc_events_docker`) should be auto-created by the Confluent Kafka image when the consumer or a producer first attempts to access it. If not, you might need to create it manually using Kafka tools (e.g., by exec-ing into the Kafka container). The `notification_events_docker` topic for notifications will also follow this behavior.
 
 5.  **Stopping Services:**
     ```bash

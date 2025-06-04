@@ -9,8 +9,8 @@ class AppSettings(BaseSettings):
 
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
-    KAFKA_TOPIC_NAME: str = "kyc_events"
-    KAFKA_CONSUMER_GROUP_ID: str = "case_management_group_cqrs_refactored" # Matches consumer
+    KAFKA_TOPIC_NAME: str = "kyc_events" # Main topic for case events
+    KAFKA_CONSUMER_GROUP_ID: str = "case_management_group_cqrs_refactored"
 
     # Observability
     LOG_LEVEL: str = "INFO"
@@ -18,6 +18,12 @@ class AppSettings(BaseSettings):
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: Optional[str] = None
     SERVICE_NAME_API: str = "case-management-api"
     SERVICE_NAME_CONSUMER: str = "case-management-consumer"
+
+    # Configuration Service Client
+    CONFIG_SERVICE_URL: Optional[str] = None # e.g., http://localhost:8081/api/v1/notification-rules
+
+    # Kafka Topic for Notifications
+    NOTIFICATION_KAFKA_TOPIC: str = "notification_events"
 
 
     class Config:

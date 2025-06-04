@@ -11,3 +11,4 @@ opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-pymongo
 python-json-logger
 pytest
+httpx

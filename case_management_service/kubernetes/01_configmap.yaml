@@ -4,15 +4,19 @@ metadata:
   name: case-management-config
   namespace: default # Or your target namespace
 data:
-  # LOG_LEVEL: "INFO" # Already in AppSettings, could be overridden here
-  # DB_NAME: "case_management_db_k8s" # Already in AppSettings
-  # KAFKA_TOPIC_NAME: "kyc_events_k8s" # Already in AppSettings
-  # KAFKA_CONSUMER_GROUP_ID: "case_management_group_k8s" # Already in AppSettings
+  # LOG_LEVEL: "INFO" # Defaulted in AppSettings, can be overridden here if needed
+  # DB_NAME: "case_management_db_k8s" # Defaulted in AppSettings
+  # KAFKA_TOPIC_NAME: "kyc_events_k8s" # Defaulted in AppSettings for main events
+  # KAFKA_CONSUMER_GROUP_ID: "case_management_group_k8s" # Defaulted in AppSettings
 
   # These are critical and likely different in K8s vs local/Docker Compose
-  MONGO_DETAILS: "mongodb://your-mongo-service-name.your-namespace.svc.cluster.local:27017" # Example:
-  KAFKA_BOOTSTRAP_SERVERS: "your-kafka-service-name.your-namespace.svc.cluster.local:9092" # Example:
+  MONGO_DETAILS: "mongodb://your-mongo-service-name.your-namespace.svc.cluster.local:27017" # Example
+  KAFKA_BOOTSTRAP_SERVERS: "your-kafka-service-name.your-namespace.svc.cluster.local:9092" # Example
 
   # OTel collector endpoint if running within K8s
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector-service.observability-namespace.svc.cluster.local:4317" # Example
   OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "http://otel-collector-service.observability-namespace.svc.cluster.local:4317" # Example
+
+  # For Notification Feature
+  CONFIG_SERVICE_URL: "http://your-config-service.your-namespace.svc.cluster.local:80" # Example K8s service URL
+  NOTIFICATION_KAFKA_TOPIC: "notification_events_k8s" # Specific topic for notifications in K8s
