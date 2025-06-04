@@ -1,4 +1,4 @@
-# Dockerfile for Case Management Service
+# Dockerfile for Case Management Service (using Poetry)
 
 # Use an official Python runtime as a parent image
 FROM python:3.9-slim-buster
@@ -6,32 +6,42 @@ FROM python:3.9-slim-buster
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV POETRY_VERSION=1.5.1 # Specify Poetry version for consistency
+ENV POETRY_HOME="/opt/poetry" # Install Poetry in a standard location
+ENV PATH="$POETRY_HOME/bin:$PATH" # Add Poetry to PATH
+
+# Install Poetry
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && curl -sSL https://install.python-poetry.org | python - \
+    && apt-get remove -y --auto-remove curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /usr/src/app
 
-# Install system dependencies (if any - e.g., for librdkafka if not handled by wheels)
-# RUN apt-get update && apt-get install -y --no-install-recommends build-essential librdkafka-dev
+# Copy only files necessary for installing dependencies first, to leverage Docker cache
+# These paths are relative to the build context (project root)
+COPY ./case_management_service/pyproject.toml ./case_management_service/poetry.lock /usr/src/app/
+# The pyproject.toml and poetry.lock are now in /usr/src/app/
 
-# Install pipenv if you were using it, or install requirements directly
-# For requirements.txt:
-COPY ./case_management_service/requirements.txt /usr/src/app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Configure Poetry to not create virtual environments within the project directory in Docker
+# and install dependencies into the system's site-packages.
+# Ensure this runs in the directory where pyproject.toml is, which is now /usr/src/app
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-dev --no-interaction --no-ansi --no-root
+    # --no-dev: Do not install development dependencies
+    # --no-interaction: Do not ask any interactive questions
+    # --no-ansi: Disable ANSI output
+    # --no-root: Do not install the project itself (as we'll COPY the source code next)
 
-# Copy the entire project (or just the service code) into the container
-# If .dockerignore is used, it can exclude venv, .git, etc.
-# The COPY command below assumes the Docker build context is the parent of case_management_service
-# So, ./case_management_service refers to the service directory within that context.
+# Copy the entire project source code into the container
+# This should come *after* installing dependencies to optimize Docker layer caching.
+# This copies the 'case_management_service' directory from host into '/usr/src/app/case_management_service' in image
 COPY ./case_management_service /usr/src/app/case_management_service
 
-# Define how the Uvicorn server for FastAPI should be run
-# Also, define how the Kafka consumer can be run.
-# We might use a startup script to run both, or define them as separate commands.
-
-# Create a startup script
-# This script will allow running either the API or the Consumer, or both (e.g. with a process manager like supervisord)
-# For simplicity now, we'll have it take an argument.
-# The startup.sh will be created inside the image, so its content is part of the RUN command.
+# Startup script (remains the same as it executes Python commands)
+# The startup.sh was created in a previous step by the Dockerfile itself.
+# Re-create it here to ensure it's part of this Dockerfile version.
 RUN echo '#!/bin/sh' > /usr/src/app/startup.sh && \
     echo 'set -e' >> /usr/src/app/startup.sh && \
     echo '' >> /usr/src/app/startup.sh && \
@@ -44,7 +54,12 @@ RUN echo '#!/bin/sh' > /usr/src/app/startup.sh && \
     echo '    COMMAND=$1' >> /usr/src/app/startup.sh && \
     echo 'fi' >> /usr/src/app/startup.sh && \
     echo '' >> /usr/src/app/startup.sh && \
-    echo '# Ensure PYTHONPATH is set correctly if modules are structured under case_management_service' >> /usr/src/app/startup.sh && \
+    # PYTHONPATH needs to allow imports like 'from case_management_service.app.main'
+    # Since our code is now in /usr/src/app/case_management_service,
+    # and pyproject.toml (which defines the "case-management-service" package for Poetry)
+    # was temporarily at /usr/src/app for `poetry install`,
+    # for Python to find `case_management_service.app...`, the directory /usr/src/app
+    # needs to be in PYTHONPATH, because inside /usr/src/app is the case_management_service folder.
     echo 'export PYTHONPATH=/usr/src/app:$PYTHONPATH' >> /usr/src/app/startup.sh && \
     echo '' >> /usr/src/app/startup.sh && \
     echo 'if [ "$COMMAND" = "api" ]; then' >> /usr/src/app/startup.sh && \
@@ -60,8 +75,8 @@ RUN echo '#!/bin/sh' > /usr/src/app/startup.sh && \
     echo 'fi' >> /usr/src/app/startup.sh && \
     chmod +x /usr/src/app/startup.sh
 
-# Expose port (though Uvicorn --port will determine it)
+# Expose port (remains the same)
 EXPOSE 8000
 
-# Default command to run the API via startup script
+# Default command (remains the same, uses startup.sh)
 CMD ["/usr/src/app/startup.sh", "api"]
