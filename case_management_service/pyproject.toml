@@ -5,22 +5,17 @@ description = "Case Management Microservice for KYC/KYB, using FastAPI, Kafka, M
 authors = ["AI Developer <ai.dev@example.com>"] # Placeholder author
 license = "MIT" # Placeholder license
 readme = "README.md"
-# packages = [{include = "case_management_service", from = ".."}] # Not typically used this way if pyproject.toml is inside the package
-# If pyproject.toml is inside 'case_management_service' directory which is the package root:
-# packages = [{include = "app"}, {include = "core"}, {include = "infrastructure"}]
-# This tells poetry that 'app', 'core', 'infrastructure' are top-level importable packages/modules
-# within the 'case_management_service' distribution.
-# For now, let's assume the structure is:
-# project_root/
-#   case_management_service/  <- This is the Python package
-#     pyproject.toml
-#     app/
-#     core/
-#     infrastructure/
-# In this case, Poetry should auto-detect `app`, `core`, `infrastructure` as part of the `case-management-service` package.
-# If `case_management_service` itself is meant to be importable (e.g. `import case_management_service.app`),
-# then the name "case-management-service" for the poetry project is fine, and it will look for modules
-# within the directory where pyproject.toml resides.
+packages = [
+    { include = "app" },
+    { include = "core" },
+    { include = "infrastructure" },
+]
+# The above 'packages' directive assumes that 'app', 'core', and 'infrastructure'
+# are directories directly under 'case_management_service/' (where this pyproject.toml resides)
+# and are intended to be importable modules of the 'case-management-service' package.
+# For example, `from app.main import ...` or `from core.commands import ...`.
+# This is a common way to structure a project managed by Poetry when pyproject.toml
+# is at the root of the source code for the package.
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -29,7 +24,7 @@ uvicorn = {extras = ["standard"], version = "^0.23.0"}
 pydantic = "^2.0"
 pydantic-settings = "^2.0"
 confluent-kafka = "^2.2.0"
-pymongo = "^4.3" # Ensure motor is not needed if using async pymongo, or add motor
+pymongo = "^4.3"
 python-json-logger = "^2.0.7"
 opentelemetry-api = "^1.19.0"
 opentelemetry-sdk = "^1.19.0"
@@ -49,7 +44,7 @@ isort = "^5.12.0"
 [tool.poetry.scripts]
 start-api = "uvicorn case_management_service.app.main:app --host 0.0.0.0 --port 8000 --reload"
 start-consumer = "python -u case_management_service.infrastructure.kafka.consumer.py"
-test = "poetry run pytest case_management_service/tests/" # Adjusted path for pytest
+test = "poetry run pytest case_management_service/tests/"
 lint = "poetry run flake8 case_management_service/"
 format = "poetry run black case_management_service/ && poetry run isort case_management_service/"
 check-format = "poetry run black --check case_management_service/ && poetry run isort --check-only case_management_service/"
