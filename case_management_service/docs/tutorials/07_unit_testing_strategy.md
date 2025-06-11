@@ -1,0 +1,169 @@
+# Tutorial 7: Unit Testing Strategy
+
+Effective unit testing is essential for ensuring code quality, maintainability, and confidence in refactoring. This tutorial outlines the unit testing strategy employed in the Case Management Microservice, highlighting how different components are tested in isolation.
+
+We primarily use Python's built-in `unittest` framework, with `unittest.mock` for creating mock objects. Tests are structured to be runnable with both `unittest`'s test discoverer and `pytest`.
+
+## 1. Testing Philosophy and Tools
+
+*   **Isolation:** Unit tests focus on testing the smallest possible unit of code (a function or a class method) in isolation from its dependencies. External dependencies (like databases, Kafka, other microservices) are mocked.
+*   **Fast Execution:** Unit tests should run quickly to provide rapid feedback during development.
+*   **Readability:** Tests should be clear and easy to understand, serving as a form of documentation for the code being tested.
+*   **Tools Used:**
+    *   **`unittest`:** Python's standard library for creating test cases, suites, and fixtures. We use `unittest.IsolatedAsyncioTestCase` for testing asynchronous code.
+    *   **`unittest.mock` (`patch`, `MagicMock`, `AsyncMock`):** For creating mock objects and patching out dependencies. `AsyncMock` is crucial for mocking asynchronous functions and methods.
+    *   **`pytest` (with `pytest-asyncio`):** While tests are written using `unittest` structure, `pytest` is recommended as a test runner due to its powerful features, plugin ecosystem, and better support for asyncio testing with `pytest-asyncio`. We include it as a dev dependency.
+    *   **Poetry:** Used to manage test dependencies and run test commands (e.g., `poetry run pytest`).
+
+## 2. Organization of Tests (`tests/` directory)
+
+The `tests/` directory mirrors the structure of the main application code (`case_management_service/`) to keep tests organized and easily discoverable:
+
+```
+case_management_service/
+├── tests/
+│   ├── __init__.py
+│   ├── app/ # Tests for FastAPI app setup, API routers
+│   │   └── test_api.py
+│   ├── core/ # Tests for core business logic
+│   │   ├── __init__.py
+│   │   ├── commands/
+│   │   │   └── test_command_handlers.py
+│   │   └── events/
+│   │       └── test_event_projectors.py
+│   └── infrastructure/ # Tests for infrastructure interactions
+│       ├── __init__.py
+│       ├── database/
+│       │   └── test_database.py # Tests for connection, event_store, read_models, etc.
+│       ├── kafka/
+│       │   ├── test_kafka_consumer.py
+│       │   ├── test_kafka_producer.py
+│       │   └── test_kafka_schemas.py # Tests for Pydantic schemas used in Kafka
+│       └── test_config_service_client.py # Test for the config service client
+# ... (other test files for new components)
+```
+
+## 3. Testing Strategies for Different Components
+
+### a. Pydantic Schemas (e.g., Kafka messages, DB models, Commands, Events)
+
+*   **Location:** Often tested where they are most relevant (e.g., Kafka message schemas in `tests/infrastructure/kafka/test_kafka_schemas.py`) or implicitly when testing components that use them.
+*   **Approach:**
+    *   Instantiate models with valid data to ensure they parse correctly.
+    *   Test validation logic by providing invalid data and asserting that `pydantic.ValidationError` is raised with appropriate error messages.
+    *   Test default values and behavior of computed fields or validators.
+    ```python
+    # Example from tests/infrastructure/kafka/test_kafka_schemas.py
+    from pydantic import ValidationError
+    # ... import your schema ...
+
+    # In a test method:
+    # For unittest style:
+    # with self.assertRaises(ValidationError) as exc_info:
+    #    kafka_schemas.KafkaMessage(**invalid_data)
+    # For pytest style (if using pytest.raises directly in a pytest test function):
+    # with pytest.raises(ValidationError) as exc_info:
+    #    kafka_schemas.KafkaMessage(**invalid_data)
+    # Assert specific error messages in exc_info.value.errors()
+    ```
+
+### b. Command Handlers (`tests/core/commands/test_command_handlers.py`)
+
+*   **Goal:** Verify that a command handler correctly processes an input command, generates the expected domain events, and calls necessary collaborators (like `save_event` and `dispatch_event_to_projectors`).
+*   **Mocking:**
+    *   `save_event` (from `infrastructure.database.event_store`): Mocked using `@patch('module.path.to.save_event', new_callable=AsyncMock)`.
+    *   `dispatch_event_to_projectors` (from `core.events.projectors`): Mocked similarly.
+    *   External service clients (e.g., `get_notification_config`): Mocked.
+    *   Kafka producer (`get_kafka_producer().produce_message`): Mocked.
+*   **Assertions:**
+    *   Check that mock collaborators are called with the correct arguments (e.g., the right event objects, correct topic for Kafka).
+    *   Verify the number of calls to mocks.
+    *   Inspect the properties of the domain events generated by the handler (e.g., `aggregate_id`, payload content, `version`).
+    *   Check the return value of the handler (e.g., the generated aggregate ID).
+
+### c. Event Projectors (`tests/core/events/test_event_projectors.py`)
+
+*   **Goal:** Ensure that a projector, when given a specific domain event, correctly transforms the event data and calls the appropriate database operation to update the read model.
+*   **Mocking:**
+    *   Database update functions (e.g., `upsert_case_read_model` from `infrastructure.database.read_models`, or functions from `document_requirements_store`): Mocked using `@patch`.
+*   **Assertions:**
+    *   Verify that the mocked database update function is called with a correctly formed Pydantic DB schema object (e.g., `CaseManagementDB`, `RequiredDocumentDB`) containing data derived from the input event.
+*   **Dispatcher Test:** The `dispatch_event_to_projectors` function itself is tested by mocking the actual projector functions (or the wrapper like `project_event_with_tracing_and_metrics`) and ensuring it routes events to the correct mocked projectors based on the `EVENT_PROJECTORS` map.
+
+### d. Kafka Consumer (`tests/infrastructure/kafka/test_kafka_consumer.py`)
+
+*   **Goal:** Test the consumer's message polling loop, deserialization, validation, command dispatching, error handling, and offset committing logic.
+*   **Mocking:**
+    *   `confluent_kafka.Consumer`: Mocked to control the messages returned by `poll()`.
+    *   Downstream functions called by the consumer:
+        *   `add_raw_event_to_store`: Mocked.
+        *   `dispatch_command` (or the command handler it calls): Mocked to isolate consumer logic.
+        *   OpenTelemetry `tracer` and metric counters: Mocked.
+        *   `extract_trace_context_from_kafka_headers`: Mocked.
+*   **Assertions:**
+    *   Verify that `consumer.poll()` is called.
+    *   Test successful processing: check that raw event storage, validation, and command dispatch occur with correct data.
+    *   Test error scenarios: JSON decoding errors, Pydantic validation errors, Kafka-specific message errors. Ensure errors are logged, spans are updated, and offsets are committed to skip problematic messages.
+    *   Verify `consumer.commit()` is called appropriately.
+
+### e. Kafka Producer (`tests/infrastructure/kafka/test_kafka_producer.py`)
+
+*   **Goal:** Test the `KafkaProducerService` for message serialization, production calls, delivery report handling, and lifecycle.
+*   **Mocking:**
+    *   `confluent_kafka.Producer`: Mocked.
+*   **Assertions:**
+    *   Check that `producer.produce()` is called with the correct topic, serialized JSON value, key, and callback.
+    *   Test `_delivery_report` logging for success and error cases.
+    *   Test `flush()` behavior.
+    *   Test lifecycle functions (`startup_kafka_producer`, `shutdown_kafka_producer`) and internal polling loop management (`start_polling`, `stop_polling`).
+
+### f. API Endpoints (`tests/app/test_api.py`)
+
+*   **Goal:** Test API request handling, request validation, response structure, and status codes.
+*   **Tool:** FastAPI's `TestClient`.
+*   **Mocking:**
+    *   Dependencies injected into API endpoints, primarily:
+        *   Read model query functions (e.g., `get_case_by_id_from_read_model` from `infrastructure.database.read_models`).
+        *   Command handlers (if API endpoints dispatch commands, e.g., for document requirements).
+        *   `get_database` (for endpoints like `/health` that use it directly).
+    *   Mock targets are the paths to these functions *as imported and used within the specific router files* (e.g., `@patch('case_management_service.app.api.routers.cases.read_model_ops.get_case_by_id_from_read_model')`).
+*   **Assertions:**
+    *   Check HTTP status codes (`response.status_code`).
+    *   Validate JSON response body structure and content (`response.json()`).
+    *   Verify that mocked dependencies were called with expected arguments.
+    *   Test error responses (e.g., 404 Not Found, 422 Unprocessable Entity for validation errors).
+
+### g. Database Interaction Modules (e.g., `tests/infrastructure/database/test_database.py`)
+
+*   **Goal:** Test the logic within database store modules (e.g., `event_store.py`, `read_models.py`, `document_requirements_store.py`).
+*   **Mocking:**
+    *   `pymongo.MongoClient` and its subordinate objects (database, collection, cursor methods like `insert_one`, `find_one`, `replace_one`, `update_one`, `find().sort().to_list()`). `AsyncMock` is used for these asynchronous database operations.
+*   **Assertions:**
+    *   Verify that the correct MongoDB collection methods are called with correctly constructed query filters, update documents (including operators like `$set`, `$push`), and options (`upsert=True`).
+    *   For retrieval functions, test that raw data from mocked DB calls is correctly parsed into Pydantic schema objects.
+    *   Test event deserialization logic in `event_store.get_events_for_aggregate`.
+    *   Test connection management in `connection.py`.
+
+## 4. Running Tests with Poetry
+
+As mentioned in the setup tutorial, tests are run using Poetry to ensure they execute within the project's managed environment with all dependencies available.
+
+From the `case_management_service/` directory (where `pyproject.toml` is):
+
+*   **Using pytest (recommended):**
+    ```bash
+    poetry run pytest tests/
+    ```
+    Or to run a specific file:
+    ```bash
+    poetry run pytest tests/core/commands/test_command_handlers.py
+    ```
+
+*   **Using unittest discover:**
+    ```bash
+    poetry run python -m unittest discover -s tests -p "test_*.py"
+    ```
+
+This testing strategy aims for comprehensive coverage, ensuring each part of the microservice functions correctly in isolation before integration.
+
+Proceed to: [**Tutorial 8: Dockerization and Local Deployment**](./08_dockerization_and_local_deployment.md)

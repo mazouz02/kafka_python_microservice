@@ -7,6 +7,7 @@ This project implements a Case Management microservice using Python, FastAPI, Ka
 
 ## Quick Links to Documentation
 
+*   [**Tutorial Series**](./docs/tutorials/summary.md) (Step-by-step guides to build a similar microservice)
 *   [**Architecture Overview**](./docs/01_architecture.md)
 *   [**API Guide**](./docs/02_api_guide.md)
 *   [**Kafka Event Contracts**](./docs/03_kafka_events_and_contracts.md) (Details on messages consumed and produced)
