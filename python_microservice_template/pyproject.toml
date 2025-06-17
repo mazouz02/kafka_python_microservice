@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "python-microservice-template"
+version = "0.1.0"
+description = "A template for Python microservices using FastAPI, with considerations for CQRS/ES, OTel, and Poetry."
+authors = ["Your Name <you@example.com>"] # Placeholder
+license = "MIT" # Placeholder
+readme = "README.md" # Will be created later
+packages = [
+    { include = "app" },
+    { include = "infra" },
+    # main.py is a script at the root of the template, not part of these packages for installation.
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.100.0"
+uvicorn = {extras = ["standard"], version = "^0.23.0"}
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+opentelemetry-sdk = "^1.19.0" # SDK includes API
+opentelemetry-instrumentation-fastapi = "^0.40b0"
+opentelemetry-exporter-otlp-proto-http = "^1.19.0" # Using HTTP OTLP exporter
+python-json-logger = "^2.0.7"
+
+# Optional dependencies to be uncommented by services built from this template:
+# pymongo = {version = "^4.3", optional = true}
+# confluent-kafka = {version = "^2.2.0", optional = true}
+# httpx = {version = "^0.25.0", optional = true} # For external service clients
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.0"
+httpx = "^0.25.0" # For TestClient, and general test HTTP calls
+flake8 = "^6.0.0"
+black = "^23.9.0"
+isort = "^5.12.0"
+
+# Example of how to define extras for optional dependencies:
+# [tool.poetry.extras]
+# mongo = ["pymongo"]
+# kafka = ["confluent-kafka"]
+# external-clients = ["httpx"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 88

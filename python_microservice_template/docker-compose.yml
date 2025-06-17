@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app: # Name of our application service
+    build:
+      context: . # Use the current directory (python_microservice_template) as build context
+      dockerfile: Dockerfile
+    container_name: python_microservice_template_app
+    ports:
+      - "8000:8000"
+    environment:
+      # These will be picked up by infra/config.py:AppSettings
+      # Values here override those in .env if .env is also loaded by Pydantic inside container,
+      # but typically for Docker, these are the primary source.
+      - SERVICE_NAME=MicroserviceTemplateDocker
+      - LOG_LEVEL=INFO
+      - OTEL_EXPORTER_OTLP_ENDPOINT_HTTP=http://jaeger:4318 # Example: send to Jaeger OTLP HTTP
+    # volumes: # Optional: Mount local code for development live reload
+    #   - .:/usr/src/app # Mounts current dir (python_microservice_template) to /usr/src/app
+    networks:
+      - microservice_template_network
+    depends_on:
+      - jaeger # Example if Jaeger was added and app should wait for it
+
+  # Optional: Jaeger for OpenTelemetry Tracing visualization
+  jaeger:
+    image: jaegertracing/all-in-one:1.48 # Use a recent Jaeger version
+    container_name: python_microservice_template_jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4318:4318"   # OTLP HTTP receiver
+      # - "4317:4317"   # OTLP gRPC receiver (if using gRPC exporter)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - microservice_template_network
+
+networks:
+  microservice_template_network:
+    driver: bridge

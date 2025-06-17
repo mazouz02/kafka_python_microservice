@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Poetry
+.venv/
+# poetry.lock # Usually committed, so not ignored by default.
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE / OS specific
+.idea/
+.vscode/
+*.DS_Store
+nbproject/
+*.sublime-project
+*.sublime-workspace
+
+# Test outputs & coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+pytestdebug.log
+.coverage
+
+# Logs
+*.log
+logs/
