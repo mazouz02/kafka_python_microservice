@@ -31,6 +31,7 @@ services:
       - "9092:9092"
       - "29092:29092"
     environment:
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -41,6 +42,11 @@ services:
       KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-topics --list --bootstrap-server kafka:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - case_management_network
 
@@ -60,23 +66,17 @@ services:
     environment:
       - MONGO_DETAILS=mongodb://mongo:27017
       - DB_NAME=case_management_db_docker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC_NAME=kyc_events_docker           # Main topic for case events
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC_NAME=kyc_events_docker
       - KAFKA_CONSUMER_GROUP_ID=case_management_group_docker
       - LOG_LEVEL=INFO
       - SERVICE_NAME_API=case-api-docker
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT= # Example: http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT= # Example: http://otel-collector:4317
-      # New variables for notifications
-      - CONFIG_SERVICE_URL=http://config-service:8080/api/v1/notification-rules # Example internal URL
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT= http://otel-collector:4317
+      - CONFIG_SERVICE_URL=http://config-service:8080/api/v1/notification-rules
       - NOTIFICATION_KAFKA_TOPIC=notification_events_docker
     volumes:
       - ./case_management_service:/usr/src/app/case_management_service
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
 
   case-management-consumer:
     build:
@@ -92,18 +92,29 @@ services:
     environment:
       - MONGO_DETAILS=mongodb://mongo:27017
       - DB_NAME=case_management_db_docker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC_NAME=kyc_events_docker           # Main topic for case events
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC_NAME=kyc_events_docker
       - KAFKA_CONSUMER_GROUP_ID=case_management_group_docker
       - LOG_LEVEL=INFO
       - SERVICE_NAME_CONSUMER=case-consumer-docker
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT= # Example: http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT= # Example: http://otel-collector:4317
-      # New variables for notifications
-      - CONFIG_SERVICE_URL=http://config-service:8080/api/v1/notification-rules # Example internal URL
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://otel-collector:4317
+      - CONFIG_SERVICE_URL=http://config-service:8080/api/v1/notification-rules
       - NOTIFICATION_KAFKA_TOPIC=notification_events_docker
     volumes:
       - ./case_management_service:/usr/src/app/case_management_service
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel_collector
+    volumes:
+    - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+    - "4317:4317"     # OTLP gRPC
+    - "4318:4318"     # OTLP HTTP (if you want it)
+    networks:
+    - case_management_network
 
 volumes:
   mongo_data:

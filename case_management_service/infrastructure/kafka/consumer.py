@@ -115,7 +115,7 @@ def consume_kafka_events():
                     consume_span.set_attribute("case.client_id", validated_message.client_id)
                     consume_span.add_event("MessageValidated", {"client_id": validated_message.client_id})
 
-                    await asyncio.run(dispatch_command(validated_message))
+                    asyncio.run(dispatch_command(validated_message))
 
                     consumer.commit(message=msg, asynchronous=False)
                     consume_span.add_event("OffsetCommitted")

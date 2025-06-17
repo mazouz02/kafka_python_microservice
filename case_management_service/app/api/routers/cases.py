@@ -1,9 +1,13 @@
 # API Router for Cases
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
+import logging
 from typing import List, Optional
 
 from case_management_service.infrastructure.database import schemas as db_schemas
 from case_management_service.infrastructure.database import read_models as read_model_ops
+from case_management_service.core.commands.models import CreateCaseCommand
+from case_management_service.core.commands.handlers import handle_create_case_command
+
 # get_database might not be needed directly if read_model_ops handles it.
 
 logger = logging.getLogger(__name__)
@@ -32,3 +36,26 @@ async def list_cases(limit: int = 10, skip: int = 0):
     except Exception as e:
         logger.error(f"Error listing cases: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list cases")
+
+@router.post(
+    "/cases",
+    status_code=202,
+    summary="Create a new case",
+    tags=["Cases"],
+)
+async def create_case_api(
+    request_data: CreateCaseCommand = Body(...)
+):
+    """
+    Publish a CreateCaseCommand to start a new case flow.
+    """
+    try:
+        case_id = await handle_create_case_command(request_data)
+        return {"case_id": case_id}
+    except ValueError as ve:
+        # for validation errors from the command model
+        logger.warning(f"Validation error creating case: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error creating case: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create case")

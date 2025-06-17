@@ -4,12 +4,12 @@ from typing import Optional
 
 class AppSettings(BaseSettings):
     # MongoDB
-    MONGO_DETAILS: str = "mongodb://localhost:27017"
+    MONGO_DETAILS: str = "mongodb://mongo:27017"
     DB_NAME: str = "case_management_db"
 
     # Kafka
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
-    KAFKA_TOPIC_NAME: str = "kyc_events" # Main topic for case events
+    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:29092"
+    KAFKA_TOPIC_NAME: str = "kyc_events_docker" # Main topic for case events
     KAFKA_CONSUMER_GROUP_ID: str = "case_management_group_cqrs_refactored"
 
     # Observability

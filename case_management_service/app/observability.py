@@ -12,8 +12,10 @@ from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExp
 from pythonjsonlogger import jsonlogger
 # For extract_trace_context_from_kafka_headers
 from opentelemetry.context import Context
-from opentelemetry.propagate import extract, set_span_in_context # Corrected: set_span_in_context is not for extraction
-from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+from opentelemetry.propagate import extract
+from opentelemetry.trace import set_span_in_context
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
 
 
 logger = logging.getLogger("case_management_service")

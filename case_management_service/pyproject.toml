@@ -29,9 +29,9 @@ python-json-logger = "^2.0.7"
 opentelemetry-api = "^1.19.0"
 opentelemetry-sdk = "^1.19.0"
 opentelemetry-exporter-otlp-proto-grpc = "^1.19.0"
-opentelemetry-instrumentation-fastapi = "^0.40b0"
-opentelemetry-instrumentation-pymongo = "^0.40b0"
 httpx = "^0.24.0"
+opentelemetry-instrumentation-fastapi = {version = "^0.55b1", allow-prereleases = true}
+opentelemetry-instrumentation-pymongo = {version = "^0.55b1", allow-prereleases = true}
 
 
 [tool.poetry.group.dev.dependencies]
@@ -40,14 +40,6 @@ pytest-asyncio = "^0.21.0"
 flake8 = "^6.0.0"
 black = "^23.7.0"
 isort = "^5.12.0"
-
-[tool.poetry.scripts]
-start-api = "uvicorn case_management_service.app.main:app --host 0.0.0.0 --port 8000 --reload"
-start-consumer = "python -u case_management_service.infrastructure.kafka.consumer.py"
-test = "poetry run pytest case_management_service/tests/"
-lint = "poetry run flake8 case_management_service/"
-format = "poetry run black case_management_service/ && poetry run isort case_management_service/"
-check-format = "poetry run black --check case_management_service/ && poetry run isort --check-only case_management_service/"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

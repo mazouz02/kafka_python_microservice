@@ -1,6 +1,7 @@
 # API Router for Persons
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
+import logging
 
 from case_management_service.infrastructure.database import schemas as db_schemas
 from case_management_service.infrastructure.database import read_models as read_model_ops

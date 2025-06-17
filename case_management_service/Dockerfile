@@ -6,10 +6,10 @@ FROM python:3.9-slim-buster
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV POETRY_VERSION=1.5.1 # Specify Poetry version for consistency
-ENV POETRY_HOME="/opt/poetry" # Install Poetry in a standard location
-ENV PATH="$POETRY_HOME/bin:$PATH" # Add Poetry to PATH
-
+ENV POETRY_VERSION=2.1.3
+ENV POETRY_HOME="/opt/poetry"
+ENV PATH="$POETRY_HOME/bin:$PATH"
+ENV UVICORN_RELOAD_FLAG=""
 # Install Poetry
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && curl -sSL https://install.python-poetry.org | python - \
@@ -28,7 +28,7 @@ COPY ./case_management_service/pyproject.toml ./case_management_service/poetry.l
 # and install dependencies into the system's site-packages.
 # Ensure this runs in the directory where pyproject.toml is, which is now /usr/src/app
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi --no-root
+    && poetry install --without dev --no-interaction --no-ansi --no-root
     # --no-dev: Do not install development dependencies
     # --no-interaction: Do not ask any interactive questions
     # --no-ansi: Disable ANSI output
@@ -64,10 +64,11 @@ RUN echo '#!/bin/sh' > /usr/src/app/startup.sh && \
     echo '' >> /usr/src/app/startup.sh && \
     echo 'if [ "$COMMAND" = "api" ]; then' >> /usr/src/app/startup.sh && \
     echo '    echo "Starting Uvicorn server for FastAPI app..."' >> /usr/src/app/startup.sh && \
-    echo '    exec uvicorn case_management_service.app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload ${UVICORN_RELOAD_FLAG:---no-reload}' >> /usr/src/app/startup.sh && \
+    echo '    exec uvicorn case_management_service.app.main:app \' >> /usr/src/app/startup.sh && \
+    echo '         --host 0.0.0.0 --port ${PORT:-8000} ${UVICORN_RELOAD_FLAG}' >> /usr/src/app/startup.sh && \
     echo 'elif [ "$COMMAND" = "consumer" ]; then' >> /usr/src/app/startup.sh && \
     echo '    echo "Starting Kafka consumer..."' >> /usr/src/app/startup.sh && \
-    echo '    exec python -u case_management_service.infrastructure.kafka.consumer.py' >> /usr/src/app/startup.sh && \
+    echo '    exec python -u -m case_management_service.infrastructure.kafka.consumer' >> /usr/src/app/startup.sh && \
     echo 'else' >> /usr/src/app/startup.sh && \
     echo '    echo "Unknown command: $COMMAND"' >> /usr/src/app/startup.sh && \
     echo '    echo "Available commands: api, consumer"' >> /usr/src/app/startup.sh && \

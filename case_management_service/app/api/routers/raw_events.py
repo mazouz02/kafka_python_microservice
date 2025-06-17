@@ -1,6 +1,7 @@
 # API Router for Raw Events
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
+import logging
 
 from case_management_service.infrastructure.database.connection import get_database
 from case_management_service.infrastructure.database import schemas as db_schemas
