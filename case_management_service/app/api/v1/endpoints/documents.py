@@ -58,6 +58,8 @@ async def determine_document_requirements_api(
     except ValueError as ve:
         logger.warning(f"Validation error determining document requirements: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException: # Specific catch for HTTPException
+        raise # Re-raise it as is
     except Exception as e:
         logger.error(f"Error determining document requirements: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to initiate document requirement determination.")
@@ -93,6 +95,8 @@ async def update_document_status_api(
     except ValueError as ve:
         logger.warning(f"Validation error updating document status for {document_requirement_id}: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException: # Specific catch for HTTPException
+        raise # Re-raise it as is
     except Exception as e:
         logger.error(f"Error updating document status for {document_requirement_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update document status.")
@@ -109,6 +113,8 @@ async def get_document_requirement_details_api(document_requirement_id: str):
         if not doc:
             raise HTTPException(status_code=404, detail=f"Document requirement ID {document_requirement_id} not found.")
         return doc
+    except HTTPException: # Specific catch for HTTPException
+        raise # Re-raise it as is
     except Exception as e:
         logger.error(f"Error retrieving document requirement {document_requirement_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve document requirement details.")
@@ -135,6 +141,8 @@ async def list_document_requirements_for_case_api( # Renamed for clarity
             is_required=is_required
         )
         return docs
+    except HTTPException: # Specific catch for HTTPException
+        raise # Re-raise it as is
     except Exception as e:
         logger.error(f"Error listing document requirements for case {case_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list document requirements.")

@@ -124,7 +124,7 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         mock_cursor_final.to_list.assert_called_once_with(length=5)
 
     # --- Cases Router Tests ---
-    @patch('case_management_service.app.api.routers.cases.read_model_ops.get_case_by_id_from_read_model', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.cases.read_model_ops.get_case_by_id_from_read_model', new_callable=AsyncMock)
     def test_get_case_by_id_found(self, mock_get_case_op):
         case_id_to_test = "case123"
         now = datetime.datetime.now(datetime.UTC)
@@ -145,14 +145,14 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response_dt.timestamp(), now.timestamp())
         mock_get_case_op.assert_called_once_with(case_id=case_id_to_test)
 
-    @patch('case_management_service.app.api.routers.cases.read_model_ops.get_case_by_id_from_read_model', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.cases.read_model_ops.get_case_by_id_from_read_model', new_callable=AsyncMock)
     def test_get_case_by_id_not_found_cases_router(self, mock_get_case_op):
         mock_get_case_op.return_value = None
         response = self.client.get("/api/v1/cases/nonexistentcase")
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json())
 
-    @patch('case_management_service.app.api.routers.cases.read_model_ops.list_cases_from_read_model', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.cases.read_model_ops.list_cases_from_read_model', new_callable=AsyncMock)
     def test_list_cases_cases_router(self, mock_list_cases_op):
         now = datetime.datetime.now(datetime.UTC)
         mock_case_list = [
@@ -167,7 +167,7 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         mock_list_cases_op.assert_called_once_with(limit=5, skip=0)
 
     # --- Persons Router Tests ---
-    @patch('case_management_service.app.api.routers.persons.read_model_ops.list_persons_for_case_from_read_model', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.persons.read_model_ops.list_persons_for_case_from_read_model', new_callable=AsyncMock)
     def test_list_persons_for_case_persons_router(self, mock_list_persons_op):
         case_id_filter = "case_for_persons"
         now = datetime.datetime.now(datetime.UTC)
@@ -184,7 +184,7 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
 
     # --- Document Requirements API Router Tests (prefix /api/v1/documents) ---
 
-    @patch('case_management_service.app.api.routers.documents.command_handlers.handle_determine_initial_document_requirements', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.documents.command_handlers.handle_determine_initial_document_requirements', new_callable=AsyncMock)
     async def test_determine_document_requirements_api(self, mock_handle_determine_docs): # Test method must be async for await
         request_payload = {
             "case_id": "case_xyz",
@@ -212,8 +212,8 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(called_cmd, command_models.DetermineInitialDocumentRequirementsCommand)
         self.assertEqual(called_cmd.case_id, "case_xyz")
 
-    @patch('case_management_service.app.api.routers.documents.document_requirements_store.get_required_document_by_id', new_callable=AsyncMock)
-    @patch('case_management_service.app.api.routers.documents.command_handlers.handle_update_document_status', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.documents.document_requirements_store.get_required_document_by_id', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.documents.command_handlers.handle_update_document_status', new_callable=AsyncMock)
     def test_update_document_status_api_success(self, mock_handle_update_status, mock_get_doc_by_id_store): # Sync test method
         doc_req_id = str(uuid.uuid4())
         request_payload = {
@@ -257,7 +257,7 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         response = self.client.put(f"/api/v1/documents/{doc_req_id}/status", json=request_payload)
         self.assertEqual(response.status_code, 404)
 
-    @patch('case_management_service.app.api.routers.documents.document_requirements_store.get_required_document_by_id', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.documents.document_requirements_store.get_required_document_by_id', new_callable=AsyncMock)
     def test_get_document_requirement_details_api_found(self, mock_get_doc_by_id_store):
         doc_req_id = str(uuid.uuid4())
         now = datetime.datetime.now(datetime.UTC)
@@ -283,7 +283,7 @@ class TestApiEndpoints(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 404)
 
 
-    @patch('case_management_service.app.api.routers.documents.document_requirements_store.list_required_documents', new_callable=AsyncMock)
+    @patch('case_management_service.app.api.v1.endpoints.documents.document_requirements_store.list_required_documents', new_callable=AsyncMock)
     def test_list_document_requirements_for_case_api(self, mock_list_docs_store): # Renamed from ..._for_entity_api
         case_id_filter = str(uuid.uuid4()) # Changed from entity_id to case_id for path
         now = datetime.datetime.now(datetime.UTC)

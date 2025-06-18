@@ -20,11 +20,11 @@ from case_management_service.infrastructure.kafka.producer import startup_kafka_
 
 
 # API Routers
-from case_management_service.app.api.routers import health as health_router
-from case_management_service.app.api.routers import cases as cases_router
-from case_management_service.app.api.routers import persons as persons_router
-from case_management_service.app.api.routers import raw_events as raw_events_router
-from case_management_service.app.api.routers import documents as documents_router
+from case_management_service.app.api.v1.endpoints import health as health_router
+from case_management_service.app.api.v1.endpoints import cases as cases_router
+from case_management_service.app.api.v1.endpoints import persons as persons_router
+from case_management_service.app.api.v1.endpoints import raw_events as raw_events_router
+from case_management_service.app.api.v1.endpoints import documents as documents_router
 
 # --- FastAPI Application Instance ---
 app = FastAPI(
