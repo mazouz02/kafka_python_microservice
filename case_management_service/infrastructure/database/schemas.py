@@ -114,5 +114,7 @@ class RequiredDocumentDB(BaseModel):
     metadata: Optional[Dict[str, Any]] = None # For storing e.g., rejection reasons, link to actual document, notes
     notes: Optional[List[str]] = Field(default_factory=list) # For audit trail or comments
 
+    version: int = 1 # Added for optimistic concurrency control on the read model
+
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))

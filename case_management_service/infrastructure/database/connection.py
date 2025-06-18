@@ -39,11 +39,22 @@ def close_mongo_connection():
         db = None
         logger.info("MongoDB connection closed.")
 
-async def get_database():
+async def get_db(): # Renamed and modified to be a generator
     global db, client
     if db is None:
-        logger.warning("Database not initialized. Attempting to connect via get_database().")
-        connect_to_mongo()
+        logger.warning("Database not initialized. Attempting to connect via get_db().")
+        connect_to_mongo() # Ensure connection is attempted if not already up
+
     if db is None:
+        # This case should ideally not be reached if connect_to_mongo succeeds
+        # or if startup events correctly establish the connection.
+        logger.error("Failed to get database instance in get_db.")
         raise ConnectionError("Database client is not available. Connection might have failed or was not established.")
-    return db
+
+    try:
+        yield db
+    finally:
+        # In this specific global connection model, we don't close the connection here
+        # as it's managed by application startup/shutdown events.
+        # If using a per-request connection model, cleanup would happen here.
+        pass

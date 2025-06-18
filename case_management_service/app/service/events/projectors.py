@@ -1,6 +1,7 @@
 # Event Projectors and Dispatcher
 import logging
 import datetime
+from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
 # Corrected imports for refactored structure
 from . import models as domain_event_models
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # --- Specific Projector Functions ---
 
-async def project_case_created(event: domain_event_models.CaseCreatedEvent):
+async def project_case_created(db: AsyncIOMotorDatabase, event: domain_event_models.CaseCreatedEvent): # Added db argument
     logger.info(f"Projecting CaseCreatedEvent: {event.event_id} for aggregate {event.aggregate_id}")
 
     case_data_for_read_model = db_schemas.CaseManagementDB(
@@ -31,10 +32,10 @@ async def project_case_created(event: domain_event_models.CaseCreatedEvent):
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-    await read_model_ops.upsert_case_read_model(case_data_for_read_model)
+    await read_model_ops.upsert_case_read_model(db, case_data_for_read_model) # Passed db
     logger.info(f"Case read model CREATED/UPDATED for ID: {event.aggregate_id} via projector.")
 
-async def project_company_profile_created(event: domain_event_models.CompanyProfileCreatedEvent):
+async def project_company_profile_created(db: AsyncIOMotorDatabase, event: domain_event_models.CompanyProfileCreatedEvent): # Added db argument
     logger.info(f"Projecting CompanyProfileCreatedEvent: {event.event_id} for company {event.aggregate_id}")
 
     company_data_for_read_model = db_schemas.CompanyProfileDB(
@@ -50,10 +51,10 @@ async def project_company_profile_created(event: domain_event_models.CompanyProf
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-    await read_model_ops.upsert_company_read_model(company_data_for_read_model)
+    await read_model_ops.upsert_company_read_model(db, company_data_for_read_model) # Passed db
     logger.info(f"CompanyProfile read model CREATED/UPDATED for ID: {event.aggregate_id} via projector.")
 
-async def project_beneficial_owner_added(event: domain_event_models.BeneficialOwnerAddedEvent):
+async def project_beneficial_owner_added(db: AsyncIOMotorDatabase, event: domain_event_models.BeneficialOwnerAddedEvent): # Added db argument
     logger.info(f"Projecting BeneficialOwnerAddedEvent: {event.event_id} for company {event.aggregate_id}")
 
     bo_data_for_read_model = db_schemas.BeneficialOwnerDB(
@@ -68,10 +69,10 @@ async def project_beneficial_owner_added(event: domain_event_models.BeneficialOw
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-    await read_model_ops.upsert_beneficial_owner_read_model(bo_data_for_read_model)
+    await read_model_ops.upsert_beneficial_owner_read_model(db, bo_data_for_read_model) # Passed db
     logger.info(f"BeneficialOwner read model CREATED/UPDATED for ID: {event.payload.beneficial_owner_id} in company {event.aggregate_id}.")
 
-async def project_person_linked_to_company(event: domain_event_models.PersonLinkedToCompanyEvent):
+async def project_person_linked_to_company(db: AsyncIOMotorDatabase, event: domain_event_models.PersonLinkedToCompanyEvent): # Added db argument
     logger.info(f"Projecting PersonLinkedToCompanyEvent: {event.event_id} for company {event.aggregate_id}")
 
     person_data_for_read_model = db_schemas.PersonDB(
@@ -84,10 +85,10 @@ async def project_person_linked_to_company(event: domain_event_models.PersonLink
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-    await read_model_ops.upsert_person_read_model(person_data_for_read_model)
+    await read_model_ops.upsert_person_read_model(db, person_data_for_read_model) # Passed db
     logger.info(f"Person read model CREATED/UPDATED for ID: {event.payload.person_id} linked to company {event.aggregate_id} with role {event.payload.role_in_company}.")
 
-async def project_person_added_to_case(event: domain_event_models.PersonAddedToCaseEvent):
+async def project_person_added_to_case(db: AsyncIOMotorDatabase, event: domain_event_models.PersonAddedToCaseEvent): # Added db argument
     logger.info(f"Projecting PersonAddedToCaseEvent: {event.event_id} for case {event.aggregate_id}")
 
     person_data_for_read_model = db_schemas.PersonDB(
@@ -99,12 +100,12 @@ async def project_person_added_to_case(event: domain_event_models.PersonAddedToC
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
-    await read_model_ops.upsert_person_read_model(person_data_for_read_model)
+    await read_model_ops.upsert_person_read_model(db, person_data_for_read_model) # Passed db
     logger.info(f"Person read model CREATED/UPDATED for ID: {event.payload.person_id} in case {event.aggregate_id}.")
 
 # --- Document Requirement Event Projectors ---
 
-async def project_document_requirement_determined(event: domain_event_models.DocumentRequirementDeterminedEvent):
+async def project_document_requirement_determined(db: AsyncIOMotorDatabase, event: domain_event_models.DocumentRequirementDeterminedEvent): # Added db argument
     logger.info(f"Projecting DocumentRequirementDeterminedEvent for case {event.payload.case_id}, entity {event.payload.entity_id}, doc type {event.payload.document_type}")
 
     doc_req_db = db_schemas.RequiredDocumentDB(
@@ -115,21 +116,24 @@ async def project_document_requirement_determined(event: domain_event_models.Doc
         document_type=event.payload.document_type,
         is_required=event.payload.is_required,
         status="AWAITING_UPLOAD",
+        version=event.version, # Set version from event
         created_at=event.timestamp,
         updated_at=event.timestamp
     )
 
-    await document_requirements_store.add_required_document(doc_req_db)
+    await document_requirements_store.add_required_document(db, doc_req_db) # Passed db
     logger.info(f"Document requirement {doc_req_db.id} (type: {doc_req_db.document_type}) created in read model.")
 
-async def project_document_status_updated(event: domain_event_models.DocumentStatusUpdatedEvent):
+async def project_document_status_updated(db: AsyncIOMotorDatabase, event: domain_event_models.DocumentStatusUpdatedEvent): # Added db argument
     logger.info(f"Projecting DocumentStatusUpdatedEvent for doc_req_id {event.payload.document_requirement_id} to status {event.payload.new_status}")
 
     updated_doc = await document_requirements_store.update_required_document_status_and_meta(
+        db, # Passed db
         doc_requirement_id=event.payload.document_requirement_id,
         new_status=event.payload.new_status,
         metadata_update=event.payload.metadata_update,
-        notes_to_add=event.payload.notes_added
+        notes_to_add=event.payload.notes_added,
+        version=event.version # Pass event version to update in read model
     )
 
     if updated_doc:
@@ -149,7 +153,7 @@ EVENT_PROJECTORS = {
 }
 
 # Wrapper for tracing and metrics (remains the same)
-async def project_event_with_tracing_and_metrics(projector_func, event: domain_event_models.BaseEvent):
+async def project_event_with_tracing_and_metrics(db: AsyncIOMotorDatabase, projector_func, event: domain_event_models.BaseEvent): # Added db argument
     event_type_str = event.event_type
     with tracer.start_as_current_span(f"projector.{event_type_str}.{projector_func.__name__}", kind=SpanKind.INTERNAL) as proj_span:
         proj_span.set_attribute("event.id", event.event_id)
@@ -158,7 +162,7 @@ async def project_event_with_tracing_and_metrics(projector_func, event: domain_e
         proj_span.set_attribute("projector.function", projector_func.__name__)
         logger.debug(f"Projector {projector_func.__name__} starting for event {event.event_id}")
         try:
-            await projector_func(event)
+            await projector_func(db, event) # Passed db
             if hasattr(domain_events_processed_counter, 'add'):
                  domain_events_processed_counter.add(1, {"projector.name": projector_func.__name__})
             if hasattr(domain_events_by_type_counter, 'add'):
@@ -171,7 +175,7 @@ async def project_event_with_tracing_and_metrics(projector_func, event: domain_e
             proj_span.set_status(Status(StatusCode.ERROR, description=f"Projector Error: {type(e).__name__}"))
             raise
 
-async def dispatch_event_to_projectors(event: domain_event_models.BaseEvent):
+async def dispatch_event_to_projectors(db: AsyncIOMotorDatabase, event: domain_event_models.BaseEvent): # Added db argument
     current_span = get_current_span()
     event_type_str = event.event_type
     current_span.add_event("DispatchingToProjectors", {"event.type": event_type_str, "event.id": event.event_id})
@@ -182,7 +186,7 @@ async def dispatch_event_to_projectors(event: domain_event_models.BaseEvent):
     if projector_functions_for_event_type:
         for projector_func in projector_functions_for_event_type:
             try:
-                await project_event_with_tracing_and_metrics(projector_func, event)
+                await project_event_with_tracing_and_metrics(db, projector_func, event) # Passed db
             except Exception as e:
                 logger.error(f"Dispatch loop encountered an error for projector {projector_func.__name__} processing event {event.event_id}: {e}", exc_info=True)
     else:

@@ -2,16 +2,16 @@
 import logging
 from typing import List, Optional, Dict, Any
 import datetime
+from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
-from .connection import get_database
 from .schemas import RequiredDocumentDB # The DB schema for required documents
 
 logger = logging.getLogger(__name__)
 DOCUMENT_REQUIREMENTS_COLLECTION = "document_requirements"
 
-async def add_required_document(doc_requirement: RequiredDocumentDB) -> RequiredDocumentDB:
+async def add_required_document(db: AsyncIOMotorDatabase, doc_requirement: RequiredDocumentDB) -> RequiredDocumentDB: # Added db argument
     """Adds a new document requirement record to the collection."""
-    db = await get_database()
+    # db = await get_database() # Removed internal call
     # Pydantic default_factory for id, created_at, updated_at handles their initialization.
     # status also has a default in the schema.
 
@@ -21,19 +21,24 @@ async def add_required_document(doc_requirement: RequiredDocumentDB) -> Required
     logger.info(f"Added document requirement ID: {doc_requirement.id} for entity {doc_requirement.entity_id} (type: {doc_requirement.document_type})")
     return doc_requirement
 
-async def update_required_document_status_and_meta(
+async def update_required_document_status_and_meta( # Added db argument
+    db: AsyncIOMotorDatabase,
     doc_requirement_id: str,
     new_status: str,
     metadata_update: Optional[Dict[str, Any]] = None,
-    notes_to_add: Optional[List[str]] = None
+    notes_to_add: Optional[List[str]] = None,
+    version: Optional[int] = None # Added version parameter
 ) -> Optional[RequiredDocumentDB]:
     """Updates the status and optionally metadata/notes of a document requirement."""
-    db = await get_database()
+    # db = await get_database() # Removed internal call
 
     set_operations: Dict[str, Any] = {
         "status": new_status,
         "updated_at": datetime.datetime.now(datetime.UTC)
     }
+    if version is not None: # If version is provided, add it to $set
+        set_operations["version"] = version
+
     push_operations: Optional[Dict[str, Any]] = None
 
     if metadata_update is not None:
@@ -54,7 +59,8 @@ async def update_required_document_status_and_meta(
 
     if not update_query: # Nothing to update
         logger.info(f"No update operations specified for document requirement ID: {doc_requirement_id}")
-        return await get_required_document_by_id(doc_requirement_id)
+        # Need to pass db to get_required_document_by_id
+        return await get_required_document_by_id(db, doc_requirement_id)
 
 
     result = await db[DOCUMENT_REQUIREMENTS_COLLECTION].update_one(
@@ -74,15 +80,16 @@ async def update_required_document_status_and_meta(
     updated_doc = await db[DOCUMENT_REQUIREMENTS_COLLECTION].find_one({"id": doc_requirement_id})
     return RequiredDocumentDB(**updated_doc) if updated_doc else None
 
-async def get_required_document_by_id(doc_requirement_id: str) -> Optional[RequiredDocumentDB]:
+async def get_required_document_by_id(db: AsyncIOMotorDatabase, doc_requirement_id: str) -> Optional[RequiredDocumentDB]: # Added db argument
     """Retrieves a specific document requirement by its ID."""
-    db = await get_database()
+    # db = await get_database() # Removed internal call
     doc = await db[DOCUMENT_REQUIREMENTS_COLLECTION].find_one({"id": doc_requirement_id})
     if doc:
         return RequiredDocumentDB(**doc)
     return None
 
-async def list_required_documents(
+async def list_required_documents( # Added db argument
+    db: AsyncIOMotorDatabase,
     case_id: Optional[str] = None,
     entity_id: Optional[str] = None,
     entity_type: Optional[str] = None,
@@ -90,7 +97,7 @@ async def list_required_documents(
     is_required: Optional[bool] = None # Added filter for is_required
 ) -> List[RequiredDocumentDB]:
     """Lists document requirements based on provided filters."""
-    db = await get_database()
+    # db = await get_database() # Removed internal call
     query_filter: Dict[str, Any] = {}
     if case_id:
         query_filter["case_id"] = case_id

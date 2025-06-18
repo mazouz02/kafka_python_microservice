@@ -25,6 +25,9 @@ class AppSettings(BaseSettings):
     # Kafka Topic for Notifications
     NOTIFICATION_KAFKA_TOPIC: str = "notification_events"
 
+    # Default HTTP client timeout
+    DEFAULT_HTTP_TIMEOUT: int = 5 # In seconds
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

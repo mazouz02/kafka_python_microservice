@@ -1,15 +1,17 @@
 # Event Store Logic (Saving and Retrieving Domain Events)
 import logging
 from typing import List, Optional
+from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
 # Corrected imports
-from .connection import get_database
 from .schemas import StoredEventDB
 # Explicitly import event and payload models
-from case_management_service.app.models.events.models import (
+from case_management_service.app.service.events.models import ( # Updated import path
     BaseEvent, EventMetaData, # Base types
     CaseCreatedEvent, CaseCreatedEventPayload,
     CompanyProfileCreatedEvent, CompanyProfileCreatedEventPayload,
+# Import custom exceptions
+from case_management_service.app.service.exceptions import ConcurrencyConflictError
     BeneficialOwnerAddedEvent, BeneficialOwnerAddedEventPayload,
     PersonLinkedToCompanyEvent, PersonLinkedToCompanyEventPayload,
     PersonAddedToCaseEvent, PersonAddedToCaseEventPayload,
@@ -46,8 +48,8 @@ PAYLOAD_CLASS_MAP = {
 }
 EVENT_STORE_COLLECTION = "domain_events"
 
-async def save_event(event_data: BaseEvent) -> BaseEvent:
-    db = await get_database()
+async def save_event(db: AsyncIOMotorDatabase, event_data: BaseEvent) -> BaseEvent: # Added db argument
+    # db = await get_database() # Removed internal call
 
     latest_event_document = await db[EVENT_STORE_COLLECTION].find_one(
         {"aggregate_id": event_data.aggregate_id},
@@ -57,10 +59,16 @@ async def save_event(event_data: BaseEvent) -> BaseEvent:
     if latest_event_document:
         latest_version = latest_event_document.get("version", 0)
 
-    if event_data.version <= latest_version and latest_version != 0 :
-        logger.warning(
-            f"Potential concurrency conflict for aggregate {event_data.aggregate_id}. "
-            f"Event version {event_data.version}, latest version in DB {latest_version}."
+    if event_data.version <= latest_version and latest_version != 0:
+        error_msg = (
+            f"Concurrency conflict for aggregate {event_data.aggregate_id}. "
+            f"Attempted event version {event_data.version}, but latest version in DB is {latest_version}."
+        )
+        logger.error(error_msg)
+        raise ConcurrencyConflictError(
+            aggregate_id=event_data.aggregate_id,
+            expected_version=event_data.version -1, # Or however expected version is derived for command
+            actual_version=latest_version
         )
 
     stored_event_payload = event_data.payload.model_dump()
@@ -83,8 +91,8 @@ async def save_event(event_data: BaseEvent) -> BaseEvent:
 
     return event_data
 
-async def get_events_for_aggregate(aggregate_id: str) -> List[BaseEvent]:
-    db = await get_database()
+async def get_events_for_aggregate(db: AsyncIOMotorDatabase, aggregate_id: str) -> List[BaseEvent]: # Added db argument
+    # db = await get_database() # Removed internal call
 
     stored_events_cursor = db[EVENT_STORE_COLLECTION].find({"aggregate_id": aggregate_id}).sort("version", 1)
 
