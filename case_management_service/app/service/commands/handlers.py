@@ -5,9 +5,9 @@ from typing import List, Optional, Dict, Any # Added Dict, Any for notification 
 
 # Corrected imports for refactored structure
 from .models import CreateCaseCommand, DetermineInitialDocumentRequirementsCommand, UpdateDocumentStatusCommand
-from case_management_service.core.events import models as domain_event_models
+from case_management_service.app.service.events import models as domain_event_models
 from case_management_service.infrastructure.database.event_store import save_event
-from case_management_service.core.events.projectors import dispatch_event_to_projectors
+from case_management_service.app.service.events.projectors import dispatch_event_to_projectors
 from case_management_service.app.observability import tracer
 from opentelemetry import trace
 

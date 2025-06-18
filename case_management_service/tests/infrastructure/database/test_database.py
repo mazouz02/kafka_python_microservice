@@ -14,7 +14,7 @@ from case_management_service.infrastructure.database import raw_event_store as d
 from case_management_service.infrastructure.database import document_requirements_store as db_doc_req_store
 # Updated schema import to include all necessary schemas
 from case_management_service.infrastructure.database import schemas as db_schemas
-from case_management_service.core.events import models as domain_event_models
+from case_management_service.app.service.events import models as domain_event_models
 from case_management_service.app import config
 from case_management_service.infrastructure.kafka.schemas import AddressData
 
@@ -91,7 +91,7 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
     # Test for new DB Schemas (Instantiation)
     def test_company_profile_db_schema_instantiation(self):
         addr = AddressData(street="1 Corp Ave", city="Corpville", country="CY", postal_code="123")
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
         company_db = db_schemas.CompanyProfileDB(
             id="comp_123",
             registered_name="Corp Inc",
@@ -187,30 +187,35 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
 
         meta_dict = db_schemas.StoredEventMetaData().model_dump()
 
-        case_event_doc = db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="CaseCreated", aggregate_id=agg_id_case, timestamp=datetime.datetime.utcnow(), version=1, payload={"client_id": "c1", "case_type": "KYB", "case_version": "v1", "traitement_type": "KYB", "company_id": agg_id_company}, metadata=meta_dict).model_dump()
+        case_event_doc = db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="CaseCreated", aggregate_id=agg_id_case, timestamp=datetime.datetime.now(datetime.UTC), version=1, payload={"client_id": "c1", "case_type": "KYB", "case_version": "v1", "traitement_type": "KYB", "company_id": agg_id_company}, metadata=meta_dict).model_dump()
         company_event_docs = [
-            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="CompanyProfileCreated", aggregate_id=agg_id_company, timestamp=datetime.datetime.utcnow(), version=1, payload={"registered_name": "Comp Ltd", "registration_number": "R1", "country_of_incorporation": "US", "registered_address": addr_data_dict}, metadata=meta_dict).model_dump(),
-            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="BeneficialOwnerAdded", aggregate_id=agg_id_company, timestamp=datetime.datetime.utcnow(), version=2, payload={"beneficial_owner_id": bo_id_unique, "person_details": bo_person_details_dict, "is_ubo": True, "ownership_percentage": 50.0, "types_of_control": ["Voting Rights"]}, metadata=meta_dict).model_dump(),
-            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="PersonLinkedToCompany", aggregate_id=agg_id_company, timestamp=datetime.datetime.utcnow(), version=3, payload={"person_id": person_id_linked, "firstname": "Dir", "lastname": "Ector", "role_in_company": "Director", "birthdate": "1980-08-08"}, metadata=meta_dict).model_dump()
+            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="CompanyProfileCreated", aggregate_id=agg_id_company, timestamp=datetime.datetime.now(datetime.UTC), version=1, payload={"registered_name": "Comp Ltd", "registration_number": "R1", "country_of_incorporation": "US", "registered_address": addr_data_dict}, metadata=meta_dict).model_dump(),
+            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="BeneficialOwnerAdded", aggregate_id=agg_id_company, timestamp=datetime.datetime.now(datetime.UTC), version=2, payload={"beneficial_owner_id": bo_id_unique, "person_details": bo_person_details_dict, "is_ubo": True, "ownership_percentage": 50.0, "types_of_control": ["Voting Rights"]}, metadata=meta_dict).model_dump(),
+            db_schemas.StoredEventDB(event_id=str(uuid.uuid4()), event_type="PersonLinkedToCompany", aggregate_id=agg_id_company, timestamp=datetime.datetime.now(datetime.UTC), version=3, payload={"person_id": person_id_linked, "firstname": "Dir", "lastname": "Ector", "role_in_company": "Director", "birthdate": "1980-08-08"}, metadata=meta_dict).model_dump()
         ]
 
-        # Configure mock for find().sort() to return different iterables based on filter
-        def mock_find_sort_side_effect(query_filter):
-            agg_filter_id = query_filter.get("aggregate_id")
-            if agg_filter_id == agg_id_case:
-                mock_cursor_case = MagicMock()
-                mock_cursor_case.__aiter__.return_value = iter([case_event_doc])
-                return mock_cursor_case
-            elif agg_filter_id == agg_id_company:
-                mock_cursor_company = MagicMock()
-                mock_cursor_company.__aiter__.return_value = iter(company_event_docs)
-                return mock_cursor_company
-            else: # Default empty cursor
-                mock_cursor_empty = MagicMock()
-                mock_cursor_empty.__aiter__.return_value = iter([])
-                return mock_cursor_empty
+        # Configure mock for find().sort()
+        mock_find_result = MagicMock()
+        mock_sort_result_case = MagicMock()
+        mock_sort_result_case.__aiter__.return_value = iter([case_event_doc])
+        mock_sort_result_company = MagicMock()
+        mock_sort_result_company.__aiter__.return_value = iter(company_event_docs)
+        mock_sort_result_empty = MagicMock()
+        mock_sort_result_empty.__aiter__.return_value = iter([])
 
-        mock_db_instance[db_event_store.EVENT_STORE_COLLECTION].find.return_value.sort = mock_find_sort_side_effect
+        def mock_find_side_effect(query_filter):
+            agg_filter_id = query_filter.get("aggregate_id")
+            # We need to return a mock that has a sort method
+            current_find_mock = MagicMock()
+            if agg_filter_id == agg_id_case:
+                current_find_mock.sort.return_value = mock_sort_result_case
+            elif agg_filter_id == agg_id_company:
+                current_find_mock.sort.return_value = mock_sort_result_company
+            else:
+                current_find_mock.sort.return_value = mock_sort_result_empty
+            return current_find_mock
+
+        mock_db_instance[db_event_store.EVENT_STORE_COLLECTION].find.side_effect = mock_find_side_effect
         mock_get_db_for_event_store.return_value = mock_db_instance
 
         retrieved_events_case = await db_event_store.get_events_for_aggregate(agg_id_case)
@@ -232,7 +237,7 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
     @patch('case_management_service.infrastructure.database.read_models.get_database')
     async def test_get_case_by_id_from_read_model(self, mock_get_db_for_read_models):
         mock_db_instance = AsyncMock()
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
         case_doc_from_db = {"id": "foundcase", "client_id": "c1", "version": "v1", "type": "t1",
                             "traitement_type": "KYC", "status": "OPEN",
                             "created_at": now, "updated_at": now}
@@ -289,7 +294,7 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
     async def test_update_required_document_status_and_meta_success(self, mock_get_db):
         mock_db_instance = AsyncMock()
         doc_req_id = "doc_req_abc"
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
         updated_doc_from_db = {
             "id": doc_req_id, "case_id": "c1", "entity_id": "e1", "entity_type": "PERSON",
             "document_type": "ID_CARD", "status": "UPLOADED", "is_required": True,
@@ -336,7 +341,7 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
     async def test_get_required_document_by_id(self, mock_get_db):
         mock_db_instance = AsyncMock()
         doc_req_id = "doc_get_id"
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
         doc_from_db = { "id": doc_req_id, "case_id": "c1", "entity_id": "e1", "entity_type": "PERSON", "document_type": "PASSPORT", "status": "AWAITING_UPLOAD", "is_required": True, "created_at": now, "updated_at": now}
 
         mock_db_instance[db_doc_req_store.DOCUMENT_REQUIREMENTS_COLLECTION].find_one = AsyncMock(return_value=doc_from_db)
@@ -352,7 +357,7 @@ class TestDatabaseInfrastructure(unittest.IsolatedAsyncioTestCase):
     @patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
     async def test_list_required_documents(self, mock_get_db):
         mock_db_instance = AsyncMock()
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.UTC)
         docs_from_db = [
             { "id": "doc1", "case_id": "c1", "entity_id": "p1", "entity_type": "PERSON", "document_type": "PASSPORT", "status": "AWAITING_UPLOAD", "is_required": True, "created_at": now, "updated_at": now},
             { "id": "doc2", "case_id": "c1", "entity_id": "p1", "entity_type": "PERSON", "document_type": "VISA", "status": "UPLOADED", "is_required": False, "created_at": now, "updated_at": now}

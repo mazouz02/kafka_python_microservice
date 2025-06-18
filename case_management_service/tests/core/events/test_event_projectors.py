@@ -6,8 +6,8 @@ import datetime
 import uuid
 
 # Modules to test and their new locations
-from case_management_service.core.events import models as domain_events
-from case_management_service.core.events import projectors as event_projectors
+from case_management_service.app.service.events import models as domain_events
+from case_management_service.app.service.events import projectors as event_projectors
 from case_management_service.infrastructure.database import schemas as db_schemas
 # Import the specific store for document requirements to mock its functions
 from case_management_service.infrastructure.database import document_requirements_store
@@ -21,7 +21,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     @patch('case_management_service.infrastructure.database.read_models.upsert_company_read_model', new_callable=AsyncMock)
     async def test_project_company_profile_created(self, mock_upsert_company_rm):
         company_id = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
         addr_data = domain_events.AddressData(street="Main St 123", city="ACity", country="US", postal_code="12345")
         payload = domain_events.CompanyProfileCreatedEventPayload(
             registered_name="Test Ltd",
@@ -47,7 +47,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     async def test_project_beneficial_owner_added(self, mock_upsert_bo_rm):
         company_id = str(uuid.uuid4())
         bo_id = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
         bo_person_details = domain_events.PersonData(firstname="BO", lastname="One", birthdate="1980-01-01")
         payload = domain_events.BeneficialOwnerAddedEventPayload(
             beneficial_owner_id=bo_id,
@@ -77,7 +77,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     async def test_project_person_linked_to_company(self, mock_upsert_person_rm):
         company_id = str(uuid.uuid4())
         person_id_linked = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
         payload = domain_events.PersonLinkedToCompanyEventPayload(
             person_id=person_id_linked,
             firstname="Director",
@@ -104,7 +104,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     async def test_project_case_created_with_kyb_link(self, mock_upsert_case_rm):
         case_id = str(uuid.uuid4())
         company_id_linked = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
         payload = domain_events.CaseCreatedEventPayload(
             client_id="client_xyz", case_type="KYB_CASE", case_version="1.0",
             traitement_type="KYB", company_id=company_id_linked
@@ -127,7 +127,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     async def test_project_person_added_to_case_kyc(self, mock_upsert_person_rm):
         case_id = str(uuid.uuid4())
         person_id = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
         event_payload = domain_events.PersonAddedToCaseEventPayload(
             person_id=person_id, firstname="Test", lastname="Person", birthdate="2000-01-01"
         )
@@ -150,7 +150,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     async def test_project_document_requirement_determined(self, mock_add_required_doc):
         case_id = str(uuid.uuid4())
         person_id = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
 
         payload = domain_events.DocumentRequirementDeterminedEventPayload(
             case_id=case_id,
@@ -180,7 +180,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
     @patch('case_management_service.infrastructure.database.document_requirements_store.update_required_document_status_and_meta', new_callable=AsyncMock)
     async def test_project_document_status_updated(self, mock_update_doc_status_meta):
         doc_req_id = str(uuid.uuid4())
-        event_timestamp = datetime.datetime.utcnow()
+        event_timestamp = datetime.datetime.now(datetime.UTC)
 
         payload = domain_events.DocumentStatusUpdatedEventPayload(
             document_requirement_id=doc_req_id,
@@ -212,7 +212,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
         )
 
     # --- Updated test_dispatch_event_to_projectors_all_event_types ---
-    @patch('case_management_service.core.events.projectors.project_event_with_tracing_and_metrics', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.events.projectors.project_event_with_tracing_and_metrics', new_callable=AsyncMock)
     async def test_dispatch_event_to_projectors_all_event_types(self, mock_project_wrapper):
         case_id = str(uuid.uuid4())
         company_id = str(uuid.uuid4())
@@ -223,8 +223,8 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
             domain_events.CaseCreatedEvent(aggregate_id=case_id, payload=domain_events.CaseCreatedEventPayload(client_id="c1", case_type="t1", case_version="v1", traitement_type="KYC"), event_type="CaseCreated"),
             domain_events.CompanyProfileCreatedEvent(aggregate_id=company_id, payload=domain_events.CompanyProfileCreatedEventPayload(registered_name="Comp", registration_number="R1", country_of_incorporation="US", registered_address=addr_data), event_type="CompanyProfileCreated"),
             domain_events.BeneficialOwnerAddedEvent(aggregate_id=company_id, payload=domain_events.BeneficialOwnerAddedEventPayload(beneficial_owner_id=str(uuid.uuid4()), person_details=domain_events.PersonData(firstname="bo", lastname="p")), event_type="BeneficialOwnerAdded"),
-            domain_events.PersonLinkedToCompanyEvent(aggregate_id=company_id, payload=domain_events.PersonLinkedToCompanyEventPayload(person_id=str(uuid.uuid4()), firstname="pf", lastname="pl", role_in_company="Dir"), event_type="PersonLinkedToCompany"),
-            domain_events.PersonAddedToCaseEvent(aggregate_id=case_id, payload=domain_events.PersonAddedToCaseEventPayload(person_id=str(uuid.uuid4()), firstname="pac_f", lastname="pac_l"), event_type="PersonAddedToCase"),
+            domain_events.PersonLinkedToCompanyEvent(aggregate_id=company_id, payload=domain_events.PersonLinkedToCompanyEventPayload(person_id=str(uuid.uuid4()), firstname="pf", lastname="pl", birthdate="1990-01-01", role_in_company="Dir"), event_type="PersonLinkedToCompany"),
+            domain_events.PersonAddedToCaseEvent(aggregate_id=case_id, payload=domain_events.PersonAddedToCaseEventPayload(person_id=str(uuid.uuid4()), firstname="pac_f", lastname="pac_l", birthdate="1990-01-01"), event_type="PersonAddedToCase"),
             domain_events.DocumentRequirementDeterminedEvent(aggregate_id=case_id, payload=domain_events.DocumentRequirementDeterminedEventPayload(case_id=case_id, entity_id="e1", entity_type="PERSON", document_type="PASSPORT", is_required=True), event_type="DocumentRequirementDetermined"),
             domain_events.DocumentStatusUpdatedEvent(aggregate_id=doc_req_id, payload=domain_events.DocumentStatusUpdatedEventPayload(document_requirement_id=doc_req_id, new_status="VERIFIED", old_status="UPLOADED"), event_type="DocumentStatusUpdated")
         ]
@@ -246,13 +246,14 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
         mock_project_wrapper.assert_has_calls(expected_calls, any_order=False)
         self.assertEqual(mock_project_wrapper.call_count, len(events_to_test))
 
-    @patch('case_management_service.core.events.projectors.domain_events_processed_counter')
-    @patch('case_management_service.core.events.projectors.domain_events_by_type_counter')
-    @patch('case_management_service.core.events.projectors.tracer')
+    @patch('case_management_service.app.service.events.projectors.domain_events_processed_counter')
+    @patch('case_management_service.app.service.events.projectors.domain_events_by_type_counter')
+    @patch('case_management_service.app.service.events.projectors.tracer')
     async def test_project_event_with_tracing_and_metrics_wrapper_success(
         self, mock_tracer, mock_by_type_counter, mock_processed_counter
     ):
-        mock_projector_func = AsyncMock(name="mock_actual_projector")
+        mock_projector_func = AsyncMock()
+        mock_projector_func.__name__ = "mock_actual_projector" # Set __name__ directly
         event_payload = domain_events.CaseCreatedEventPayload(client_id="c1", case_type="t1", case_version="v1", traitement_type="KYC")
         event_to_project = domain_events.CaseCreatedEvent(aggregate_id=str(uuid.uuid4()), payload=event_payload, event_type="CaseCreated")
         mock_span = MagicMock()
@@ -261,13 +262,16 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
         await event_projectors.project_event_with_tracing_and_metrics(mock_projector_func, event_to_project)
 
         mock_projector_func.assert_called_once_with(event_to_project)
-        mock_span.set_status.assert_called_once_with(Status(StatusCode.OK))
+        mock_span.set_status.assert_called_once()
+        called_status_ok = mock_span.set_status.call_args[0][0]
+        self.assertEqual(called_status_ok.status_code, StatusCode.OK)
         mock_processed_counter.add.assert_called_once_with(1, {"projector.name": "mock_actual_projector"})
         mock_by_type_counter.add.assert_called_once_with(1, {"event.type": "CaseCreated", "projector.name": "mock_actual_projector"})
 
-    @patch('case_management_service.core.events.projectors.tracer')
+    @patch('case_management_service.app.service.events.projectors.tracer')
     async def test_project_event_with_tracing_and_metrics_wrapper_failure(self, mock_tracer):
-        mock_projector_func = AsyncMock(name="mock_failing_projector", side_effect=ValueError("Projection failed"))
+        mock_projector_func = AsyncMock(side_effect=ValueError("Projection failed"))
+        mock_projector_func.__name__ = "mock_failing_projector" # Set __name__ directly
         event_payload = domain_events.CaseCreatedEventPayload(client_id="c1", case_type="t1", case_version="v1", traitement_type="KYC")
         event_to_project = domain_events.CaseCreatedEvent(aggregate_id=str(uuid.uuid4()), payload=event_payload, event_type="CaseCreated")
         mock_span = MagicMock()
@@ -278,4 +282,7 @@ class TestEventProjectors(unittest.IsolatedAsyncioTestCase):
 
         mock_projector_func.assert_called_once_with(event_to_project)
         mock_span.record_exception.assert_called_once()
-        mock_span.set_status.assert_called_once_with(Status(StatusCode.ERROR, description="Projector Error: ValueError"))
+        mock_span.set_status.assert_called_once()
+        called_status_err = mock_span.set_status.call_args[0][0]
+        self.assertEqual(called_status_err.status_code, StatusCode.ERROR)
+        self.assertEqual(called_status_err.description, "Projector Error: ValueError")

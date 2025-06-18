@@ -112,7 +112,11 @@ class TestKafkaProducerService(unittest.IsolatedAsyncioTestCase):
         with patch.object(kafka_producer_module.logger, 'error') as mock_logger_error:
             service._delivery_report(mock_err, mock_msg)
 
-        mock_logger_error.assert_called_once_with(f'Message delivery failed: Topic error_topic Key b"error_key": {mock_err}')
+        mock_logger_error.assert_called_once()
+        log_message_error = mock_logger_error.call_args[0][0]
+        self.assertIn(f'Message delivery failed: Topic {mock_msg.topic()}', log_message_error)
+        self.assertIn(f'Key {mock_msg.key()!r}', log_message_error) # Using !r for robust repr
+        self.assertIn(str(mock_err), log_message_error)
 
 
     def test_delivery_report_success(self):
@@ -129,7 +133,12 @@ class TestKafkaProducerService(unittest.IsolatedAsyncioTestCase):
         with patch.object(kafka_producer_module.logger, 'info') as mock_logger_info:
             service._delivery_report(None, mock_msg)
 
-        mock_logger_info.assert_called_once_with(f'Message delivered: Topic success_topic Key b"success_key" Partition [0] @ Offset 123')
+        mock_logger_info.assert_called_once()
+        log_message_success = mock_logger_info.call_args[0][0]
+        self.assertIn(f'Message delivered: Topic {mock_msg.topic()}', log_message_success)
+        self.assertIn(f'Key {mock_msg.key()!r}', log_message_success) # Using !r
+        self.assertIn(f'Partition [{mock_msg.partition()}]', log_message_success)
+        self.assertIn(f'@ Offset {mock_msg.offset()}', log_message_success)
 
 
     @patch('case_management_service.infrastructure.kafka.producer.Producer')

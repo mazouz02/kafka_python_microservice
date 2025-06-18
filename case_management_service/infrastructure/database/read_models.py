@@ -14,7 +14,7 @@ async def upsert_case_read_model(case_data: CaseManagementDB) -> CaseManagementD
     db = await get_database()
 
     case_dict = case_data.model_dump()
-    case_dict["updated_at"] = datetime.datetime.utcnow()
+    case_dict["updated_at"] = datetime.datetime.now(datetime.UTC)
 
     await db.cases.replace_one(
         {"id": case_data.id},
@@ -29,7 +29,7 @@ async def upsert_person_read_model(person_data: PersonDB) -> PersonDB:
     """Creates or updates a person document in the read model (persons collection)."""
     db = await get_database()
     person_dict = person_data.model_dump()
-    person_dict["updated_at"] = datetime.datetime.utcnow()
+    person_dict["updated_at"] = datetime.datetime.now(datetime.UTC)
 
     await db.persons.replace_one(
         {"id": person_data.id},
@@ -60,7 +60,7 @@ async def upsert_company_read_model(company_data: CompanyProfileDB) -> CompanyPr
     """Creates or updates a company document in the read model (companies collection)."""
     db = await get_database()
     company_dict = company_data.model_dump()
-    company_dict["updated_at"] = datetime.datetime.utcnow() # Ensure updated_at is fresh
+    company_dict["updated_at"] = datetime.datetime.now(datetime.UTC) # Ensure updated_at is fresh
 
     await db.companies.replace_one(
         {"id": company_data.id}, # Filter by company_id
@@ -74,7 +74,7 @@ async def upsert_beneficial_owner_read_model(bo_data: BeneficialOwnerDB) -> Bene
     """Creates or updates a beneficial owner document in the read model (beneficial_owners collection)."""
     db = await get_database()
     bo_dict = bo_data.model_dump()
-    bo_dict["updated_at"] = datetime.datetime.utcnow()
+    bo_dict["updated_at"] = datetime.datetime.now(datetime.UTC)
 
     await db.beneficial_owners.replace_one(
         {"id": bo_data.id}, # Filter by bo_id

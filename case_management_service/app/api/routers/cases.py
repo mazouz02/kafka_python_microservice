@@ -5,8 +5,8 @@ from typing import List, Optional
 
 from case_management_service.infrastructure.database import schemas as db_schemas
 from case_management_service.infrastructure.database import read_models as read_model_ops
-from case_management_service.core.commands.models import CreateCaseCommand
-from case_management_service.core.commands.handlers import handle_create_case_command
+from case_management_service.app.service.commands.models import CreateCaseCommand
+from case_management_service.app.service.commands.handlers import handle_create_case_command
 
 # get_database might not be needed directly if read_model_ops handles it.
 

@@ -32,7 +32,7 @@ async def update_required_document_status_and_meta(
 
     set_operations: Dict[str, Any] = {
         "status": new_status,
-        "updated_at": datetime.datetime.utcnow()
+        "updated_at": datetime.datetime.now(datetime.UTC)
     }
     push_operations: Optional[Dict[str, Any]] = None
 

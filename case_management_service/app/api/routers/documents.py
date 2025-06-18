@@ -6,9 +6,9 @@ from pydantic import BaseModel # Ensure BaseModel is imported
 
 from case_management_service.app.config import settings
 # Command models
-from case_management_service.core.commands import models as command_models
+from case_management_service.app.service.commands import models as command_models
 # Command handlers (or a dispatch function)
-from case_management_service.core.commands import handlers as command_handlers
+from case_management_service.app.service.commands import handlers as command_handlers
 # DB Schemas (for response models)
 from case_management_service.infrastructure.database import schemas as db_schemas
 # DB Store for querying document requirements (for GET endpoints)

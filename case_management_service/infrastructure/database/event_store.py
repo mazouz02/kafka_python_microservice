@@ -5,13 +5,48 @@ from typing import List, Optional
 # Corrected imports
 from .connection import get_database
 from .schemas import StoredEventDB
-from case_management_service.core.events import models as domain_event_models
-
+# Explicitly import event and payload models
+from case_management_service.app.service.events.models import (
+    BaseEvent, EventMetaData, # Base types
+    CaseCreatedEvent, CaseCreatedEventPayload,
+    CompanyProfileCreatedEvent, CompanyProfileCreatedEventPayload,
+    BeneficialOwnerAddedEvent, BeneficialOwnerAddedEventPayload,
+    PersonLinkedToCompanyEvent, PersonLinkedToCompanyEventPayload,
+    PersonAddedToCaseEvent, PersonAddedToCaseEventPayload,
+    DocumentRequirementDeterminedEvent, DocumentRequirementDeterminedEventPayload,
+    DocumentStatusUpdatedEvent, DocumentStatusUpdatedEventPayload,
+    NotificationRequiredEvent, NotificationRequiredEventPayload
+)
 
 logger = logging.getLogger(__name__)
+
+# Mapping for event types to their classes
+# Event type strings are as defined in the event_type attribute of each event model
+EVENT_CLASS_MAP = {
+    "CaseCreated": CaseCreatedEvent,
+    "CompanyProfileCreated": CompanyProfileCreatedEvent,
+    "BeneficialOwnerAdded": BeneficialOwnerAddedEvent,
+    "PersonLinkedToCompany": PersonLinkedToCompanyEvent,
+    "PersonAddedToCase": PersonAddedToCaseEvent,
+    "DocumentRequirementDetermined": DocumentRequirementDeterminedEvent,
+    "DocumentStatusUpdated": DocumentStatusUpdatedEvent,
+    "NotificationRequired": NotificationRequiredEvent,
+}
+
+# Mapping for payload model names to their classes
+PAYLOAD_CLASS_MAP = {
+    "CaseCreatedEventPayload": CaseCreatedEventPayload,
+    "CompanyProfileCreatedEventPayload": CompanyProfileCreatedEventPayload,
+    "BeneficialOwnerAddedEventPayload": BeneficialOwnerAddedEventPayload,
+    "PersonLinkedToCompanyEventPayload": PersonLinkedToCompanyEventPayload,
+    "PersonAddedToCaseEventPayload": PersonAddedToCaseEventPayload,
+    "DocumentRequirementDeterminedEventPayload": DocumentRequirementDeterminedEventPayload,
+    "DocumentStatusUpdatedEventPayload": DocumentStatusUpdatedEventPayload,
+    "NotificationRequiredEventPayload": NotificationRequiredEventPayload,
+}
 EVENT_STORE_COLLECTION = "domain_events"
 
-async def save_event(event_data: domain_event_models.BaseEvent) -> domain_event_models.BaseEvent:
+async def save_event(event_data: BaseEvent) -> BaseEvent:
     db = await get_database()
 
     latest_event_document = await db[EVENT_STORE_COLLECTION].find_one(
@@ -48,7 +83,7 @@ async def save_event(event_data: domain_event_models.BaseEvent) -> domain_event_
 
     return event_data
 
-async def get_events_for_aggregate(aggregate_id: str) -> List[domain_event_models.BaseEvent]:
+async def get_events_for_aggregate(aggregate_id: str) -> List[BaseEvent]:
     db = await get_database()
 
     stored_events_cursor = db[EVENT_STORE_COLLECTION].find({"aggregate_id": aggregate_id}).sort("version", 1)
@@ -61,41 +96,49 @@ async def get_events_for_aggregate(aggregate_id: str) -> List[domain_event_model
             logger.error(f"Invalid event document structure in DB for aggregate {aggregate_id}, doc: {event_doc}. Error: {e}", exc_info=True)
             continue
 
-        event_type_str = stored_event.event_type
+        event_type_str = stored_event.event_type # e.g., "CaseCreated"
         payload_dict = stored_event.payload
 
-        DomainEventClass = getattr(domain_event_models, event_type_str + "Event", None)
+        DomainEventClass = EVENT_CLASS_MAP.get(event_type_str)
 
-        if DomainEventClass and hasattr(DomainEventClass, 'payload_model_name'):
-            PayloadModelStr = getattr(DomainEventClass, 'payload_model_name')
-            PayloadModelClass = getattr(domain_event_models, PayloadModelStr, None)
+        if DomainEventClass:
+            # payload_model_name is a class variable on specific event types
+            PayloadModelStr = getattr(DomainEventClass, 'payload_model_name', None)
+            if not PayloadModelStr:
+                logger.error(f"Event class {DomainEventClass.__name__} is missing 'payload_model_name' attribute.")
+                continue
+
+            PayloadModelClass = PAYLOAD_CLASS_MAP.get(PayloadModelStr)
 
             if PayloadModelClass:
                 try:
                     deserialized_payload = PayloadModelClass(**payload_dict)
 
                     # Reconstruct domain's EventMetaData from StoredEventMetaData dict
-                    deserialized_metadata = domain_event_models.EventMetaData(**stored_event.metadata.model_dump())
+                    # Ensure stored_event.metadata is not None before dumping
+                    meta_data_dict = stored_event.metadata.model_dump() if stored_event.metadata else {}
+                    deserialized_metadata = EventMetaData(**meta_data_dict)
 
                     domain_event_instance = DomainEventClass(
                         event_id=stored_event.event_id,
-                        event_type=stored_event.event_type,
+                        # event_type is set by the DomainEventClass itself, no need to pass from stored_event
                         aggregate_id=stored_event.aggregate_id,
                         timestamp=stored_event.timestamp,
                         version=stored_event.version,
                         payload=deserialized_payload,
                         metadata=deserialized_metadata
                     )
-                    if hasattr(domain_event_instance, 'payload_model_name'):
-                         setattr(domain_event_instance, 'payload_model_name', PayloadModelStr)
+                    # The payload_model_name is already part of the class definition,
+                    # no need to setattr unless it's managed differently.
+                    # It's a class var, so instances will have access to it via their class.
 
                     deserialized_domain_events.append(domain_event_instance)
                 except Exception as e:
                     logger.error(f"Error deserializing payload for event {stored_event.event_id} of type {event_type_str}: {e}", exc_info=True)
             else:
-                logger.warning(f"Payload model '{PayloadModelStr}' not found for event type '{event_type_str}'. Aggregate: {aggregate_id}")
+                logger.warning(f"Payload model class '{PayloadModelStr}' not found in PAYLOAD_CLASS_MAP for event type '{event_type_str}'. Aggregate: {aggregate_id}")
         else:
-            logger.warning(f"Domain event class '{event_type_str}Event' or its 'payload_model_name' not found. Aggregate: {aggregate_id}")
+            logger.warning(f"Domain event class for event_type '{event_type_str}' not found in EVENT_CLASS_MAP. Aggregate: {aggregate_id}")
 
     logger.info(f"Retrieved and deserialized {len(deserialized_domain_events)} events for aggregate {aggregate_id}.")
     return deserialized_domain_events

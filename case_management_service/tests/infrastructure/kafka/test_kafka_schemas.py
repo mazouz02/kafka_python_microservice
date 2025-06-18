@@ -87,10 +87,12 @@ class TestKafkaSchemas(unittest.TestCase):
         msg_data = {"client_id": "c1", "version": "1.0", "type": "T1", "traitement_type": "INVALID_TYPE", "persons": []}
         with self.assertRaises(ValidationError) as exc_info: # Using unittest.assertRaises
             kafka_schemas.KafkaMessage(**msg_data)
-        # Pydantic V1 errors are in exc_info.exception.errors()
-        # Pydantic V2 errors are in exc_info.exception.errors(include_context=False)
-        # For simplicity, checking the string representation of the exception.
-        self.assertTrue(any("traitement_type must be either KYC or KYB" in str(e.get('msg','')).lower() or "Input should be 'KYC' or 'KYB'" in str(e.get('msg','')).lower() for e in exc_info.exception.errors()))
+        errors = exc_info.exception.errors()
+        self.assertTrue(any(
+            e['loc'] == ('traitement_type',) and
+            e['msg'] == 'Value error, traitement_type must be either KYC or KYB'
+            for e in errors
+        ), f"Errors: {errors}")
 
 
     def test_kafka_message_kyb_missing_company_profile(self):
@@ -102,7 +104,12 @@ class TestKafkaSchemas(unittest.TestCase):
         }
         with self.assertRaises(ValidationError) as exc_info:
             kafka_schemas.KafkaMessage(**msg_data)
-        self.assertTrue(any("company_profile is required when traitement_type is KYB" in str(e.get('msg','')).lower() for e in exc_info.exception.errors()))
+        errors = exc_info.exception.errors()
+        self.assertTrue(any(
+            e['loc'] == () and
+            'company_profile is required when traitement_type is KYB' in e['msg']
+            for e in errors
+        ), f"Errors: {errors}")
 
     def test_kafka_message_kyc_with_company_profile_allowed(self):
         addr_data = {"street": "1 Business Rd", "city": "Corpville", "country": "US", "postal_code": "CV1 2BC"}
@@ -133,7 +140,12 @@ class TestKafkaSchemas(unittest.TestCase):
         }
         with self.assertRaises(ValidationError) as exc_info:
             kafka_schemas.KafkaMessage(**msg_data)
-        self.assertTrue(any("beneficial_owners should not be provided or be empty when traitement_type is KYC" in str(e.get('msg','')).lower() for e in exc_info.exception.errors()))
+        errors = exc_info.exception.errors()
+        self.assertTrue(any(
+            e['loc'] == () and
+            'beneficial_owners should be empty or not provided when traitement_type is KYC' in e['msg']
+            for e in errors
+        ), f"Errors: {errors}")
 
     def test_kafka_message_kyc_with_empty_beneficial_owners_allowed(self):
         msg_data = {

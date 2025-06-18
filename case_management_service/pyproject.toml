@@ -7,10 +7,10 @@ license = "MIT" # Placeholder license
 readme = "README.md"
 packages = [
     { include = "app" },
-    { include = "core" },
+    # { include = "core" }, # 'core' has been moved to app/service
     { include = "infrastructure" },
 ]
-# The above 'packages' directive assumes that 'app', 'core', and 'infrastructure'
+# The above 'packages' directive assumes that 'app', and 'infrastructure'
 # are directories directly under 'case_management_service/' (where this pyproject.toml resides)
 # and are intended to be importable modules of the 'case-management-service' package.
 # For example, `from app.main import ...` or `from core.commands import ...`.

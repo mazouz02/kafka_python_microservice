@@ -22,8 +22,8 @@ class PersonDB(BaseModel):
     role_in_company: Optional[str] = None # New field
     # email, phone etc. can be added later
 
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
 
 class CaseManagementDB(BaseModel): # Read Model for Cases
     id: str = Field(default_factory=lambda: str(uuid.uuid4().hex)) # This is the case_id
@@ -39,14 +39,14 @@ class CaseManagementDB(BaseModel): # Read Model for Cases
     # primary_person_name: Optional[str] = None
 
     status: str = Field(default="OPEN") # e.g., OPEN, PENDING_REVIEW, CLOSED. Default to OPEN.
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
 
 class RawEventDB(BaseModel): # For storing raw incoming messages (e.g. from Kafka)
     id: str = Field(default_factory=lambda: str(uuid.uuid4().hex))
     event_type: str # e.g., "KAFKA_MESSAGE_RAW_STORED"
     payload: Dict[str, Any]   # The raw message payload as a dictionary. Changed from 'dict' to 'Dict[str, Any]'
-    received_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    received_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
     processed_at: Optional[datetime.datetime] = None # Timestamp when it was processed into domain events
 
 # --- New Read Model Schemas for Company and BO ---
@@ -65,8 +65,8 @@ class CompanyProfileDB(BaseModel): # Read Model for Companies
 
     # active_case_id: Optional[str] = None # Link back to an active case if needed
 
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
 
 class BeneficialOwnerDB(BaseModel): # Read Model for Beneficial Owners
     id: str # This is the beneficial_owner_id from BeneficialOwnerAddedEventPayload
@@ -82,8 +82,8 @@ class BeneficialOwnerDB(BaseModel): # Read Model for Beneficial Owners
     types_of_control: Optional[List[str]] = Field(default_factory=list)
     is_ubo: bool = False
 
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
 
 
 # --- Schema for Stored Domain Events in Event Store ---
@@ -95,7 +95,7 @@ class StoredEventDB(BaseModel): # For storing domain events in MongoDB
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
     aggregate_id: str
-    timestamp: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    timestamp: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
     version: int = 1
     payload: Dict[str, Any] # Stored as a dictionary, matches domain event's Pydantic payload model_dump()
     metadata: StoredEventMetaData = Field(default_factory=StoredEventMetaData)
@@ -114,5 +114,5 @@ class RequiredDocumentDB(BaseModel):
     metadata: Optional[Dict[str, Any]] = None # For storing e.g., rejection reasons, link to actual document, notes
     notes: Optional[List[str]] = Field(default_factory=list) # For audit trail or comments
 
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))

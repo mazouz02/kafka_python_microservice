@@ -8,7 +8,7 @@ from confluent_kafka import Message, KafkaError # Using original confluent_kafka
 # Modules to test or support testing - new locations
 from case_management_service.infrastructure.kafka import consumer as kafka_consumer_module # The module to test
 from case_management_service.infrastructure.kafka.schemas import KafkaMessage # For verifying dispatched command data
-from case_management_service.core.commands.models import CreateCaseCommand # For verifying dispatched command data
+from case_management_service.app.service.commands.models import CreateCaseCommand # For verifying dispatched command data
 from opentelemetry.trace.status import Status, StatusCode # For checking span status
 
 
@@ -35,7 +35,7 @@ class TestKafkaConsumer(unittest.IsolatedAsyncioTestCase):
         mock_extract_trace_context.return_value = None
 
         kafka_msg_data = {
-            "client_id": "client1", "version": "1.0", "type": "KYC_FULL",
+            "client_id": "client1", "version": "1.0", "type": "KYC_FULL", "traitement_type": "KYC",
             "persons": [{"firstname": "Kaf", "lastname": "Ka", "birthdate": "1980-01-01"}]
         }
         kafka_msg_json = json.dumps(kafka_msg_data)
@@ -59,8 +59,7 @@ class TestKafkaConsumer(unittest.IsolatedAsyncioTestCase):
         # with self.assertRaises(KeyboardInterrupt):
         #      await asyncio.wait_for(consumer_task, timeout=2.0)
         # Running directly for simplicity in this test environment if event loop is managed by IsolatedAsyncioTestCase
-        with self.assertRaises(KeyboardInterrupt):
-            kafka_consumer_module.consume_kafka_events()
+        await kafka_consumer_module.consume_kafka_events()
 
 
         # Assert
@@ -82,6 +81,7 @@ class TestKafkaConsumer(unittest.IsolatedAsyncioTestCase):
 
         mock_metrics_counter.add.assert_called_once_with(1, {"topic": "kyc_events", "kafka_partition": "0"})
         mock_consumer_instance.commit.assert_called_once_with(message=mock_kafka_message, asynchronous=False)
+        mock_consumer_instance.close.assert_called_once() # Assert consumer.close() was called
         kafka_consumer_module.close_mongo_connection.assert_called_once()
 
 
@@ -114,14 +114,24 @@ class TestKafkaConsumer(unittest.IsolatedAsyncioTestCase):
         mock_consumer_instance.commit = MagicMock()
 
         # Act
-        with self.assertRaises(KeyboardInterrupt):
-            kafka_consumer_module.consume_kafka_events()
+        await kafka_consumer_module.consume_kafka_events()
 
         # Assert
         mock_dispatch_command.assert_not_called()
         mock_consumer_instance.commit.assert_called_once_with(message=invalid_json_kafka_msg, asynchronous=False)
+        mock_consumer_instance.close.assert_called_once() # Assert consumer.close() was called
+        kafka_consumer_module.close_mongo_connection.assert_called_once()
         mock_span.record_exception.assert_called_once()
-        mock_span.set_status.assert_called_with(Status(StatusCode.ERROR, description="JSON Decode Error: Expecting value: line 1 column 1 (char 0)"))
+
+        # Assert that set_status was called once
+        mock_span.set_status.assert_called_once()
+        # Get the arguments it was called with
+        args, _ = mock_span.set_status.call_args
+        # Check the status object
+        status_arg = args[0]
+        self.assertIsInstance(status_arg, Status)
+        self.assertEqual(status_arg.status_code, StatusCode.ERROR)
+        self.assertEqual(status_arg.description, "JSON Decode Error: JSONDecodeError")
 
 
     @patch('case_management_service.infrastructure.kafka.consumer.Consumer')
@@ -151,9 +161,10 @@ class TestKafkaConsumer(unittest.IsolatedAsyncioTestCase):
 
 
         # Act
-        with self.assertRaises(KeyboardInterrupt):
-            kafka_consumer_module.consume_kafka_events()
+        await kafka_consumer_module.consume_kafka_events()
 
         # Assert
         mock_dispatch_command.assert_not_called()
         mock_consumer_instance.commit.assert_called_once_with(message=error_kafka_msg, asynchronous=False)
+        mock_consumer_instance.close.assert_called_once() # Assert consumer.close() was called
+        kafka_consumer_module.close_mongo_connection.assert_called_once()

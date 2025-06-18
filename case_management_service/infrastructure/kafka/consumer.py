@@ -13,8 +13,8 @@ from opentelemetry.trace.status import StatusCode, Status
 # Corrected imports based on new structure
 from case_management_service.app.config import settings
 from .schemas import KafkaMessage
-from case_management_service.core.commands.models import CreateCaseCommand
-from case_management_service.core.commands.handlers import handle_create_case_command
+from case_management_service.app.service.commands.models import CreateCaseCommand
+from case_management_service.app.service.commands.handlers import handle_create_case_command
 # Import the new histogram along with other observability components
 from case_management_service.app.observability import (
     tracer,
@@ -54,7 +54,7 @@ async def dispatch_command(validated_message: KafkaMessage):
         logger.info(f"Command {create_case_cmd.command_id} (for client {validated_message.client_id}) dispatched, resulted in case_id: {case_id}. Latency: {latency:.4f}s")
 
 
-def consume_kafka_events():
+async def consume_kafka_events():
     logger.info("Initializing Kafka consumer...")
     conf = {
         'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVERS,
@@ -108,14 +108,14 @@ def consume_kafka_events():
                     message_data = json.loads(message_data_str)
                     consume_span.add_event("MessageDecodedSuccessfully")
 
-                    raw_event_persisted = asyncio.run(add_raw_event_to_store(message_data, event_type="KAFKA_MESSAGE_RAW_STORED"))
+                    raw_event_persisted = await add_raw_event_to_store(message_data, event_type="KAFKA_MESSAGE_RAW_STORED")
                     consume_span.add_event("RawMessageStored", {"raw_event.id": raw_event_persisted.id})
 
                     validated_message = KafkaMessage(**message_data)
                     consume_span.set_attribute("case.client_id", validated_message.client_id)
                     consume_span.add_event("MessageValidated", {"client_id": validated_message.client_id})
 
-                    asyncio.run(dispatch_command(validated_message))
+                    await dispatch_command(validated_message)
 
                     consumer.commit(message=msg, asynchronous=False)
                     consume_span.add_event("OffsetCommitted")
@@ -148,4 +148,4 @@ if __name__ == '__main__':
     setup_opentelemetry(service_name=settings.SERVICE_NAME_CONSUMER)
 
     logger.info("Starting Kafka consumer directly (refactored version using AppSettings)...")
-    consume_kafka_events()
+    asyncio.run(consume_kafka_events())

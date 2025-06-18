@@ -1,6 +1,6 @@
 # Pydantic models for Domain Events
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, ClassVar # Import ClassVar
 import datetime
 import uuid
 
@@ -15,11 +15,11 @@ class BaseEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
     aggregate_id: str
-    timestamp: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    timestamp: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
     version: int = 1
     payload: BaseModel
     metadata: EventMetaData = Field(default_factory=EventMetaData)
-    payload_model_name: Optional[str] = None
+    # payload_model_name should be a ClassVar on concrete event types, not an instance field on BaseEvent.
 
 # --- Existing Event Payloads - Modifications ---
 class CaseCreatedEventPayload(BaseModel):
@@ -48,7 +48,7 @@ class CompanyProfileCreatedEventPayload(CompanyProfileEventPayloadStructure):
 class CompanyProfileCreatedEvent(BaseEvent):
     event_type: str = "CompanyProfileCreated"
     payload: CompanyProfileCreatedEventPayload
-    payload_model_name: str = "CompanyProfileCreatedEventPayload"
+    payload_model_name: ClassVar[str] = "CompanyProfileCreatedEventPayload"
 
 # Beneficial Owner Events
 class BeneficialOwnerEventPayloadStructure(BaseModel):
@@ -63,7 +63,7 @@ class BeneficialOwnerAddedEventPayload(BeneficialOwnerEventPayloadStructure):
 class BeneficialOwnerAddedEvent(BaseEvent):
     event_type: str = "BeneficialOwnerAdded"
     payload: BeneficialOwnerAddedEventPayload
-    payload_model_name: str = "BeneficialOwnerAddedEventPayload"
+    payload_model_name: ClassVar[str] = "BeneficialOwnerAddedEventPayload"
 
 # Person Event Modifications/Additions
 class PersonAddedToCaseEventPayload(BaseModel):
@@ -82,18 +82,18 @@ class PersonLinkedToCompanyEventPayload(BaseModel):
 class PersonLinkedToCompanyEvent(BaseEvent):
     event_type: str = "PersonLinkedToCompany"
     payload: PersonLinkedToCompanyEventPayload
-    payload_model_name: str = "PersonLinkedToCompanyEventPayload"
+    payload_model_name: ClassVar[str] = "PersonLinkedToCompanyEventPayload"
 
 # --- Existing Events - Ensure they use the updated BaseEvent and payloads ---
 class CaseCreatedEvent(BaseEvent):
     event_type: str = "CaseCreated"
     payload: CaseCreatedEventPayload
-    payload_model_name: str = "CaseCreatedEventPayload"
+    payload_model_name: ClassVar[str] = "CaseCreatedEventPayload"
 
 class PersonAddedToCaseEvent(BaseEvent):
     event_type: str = "PersonAddedToCase"
     payload: PersonAddedToCaseEventPayload
-    payload_model_name: str = "PersonAddedToCaseEventPayload"
+    payload_model_name: ClassVar[str] = "PersonAddedToCaseEventPayload"
 
 # --- Document Requirement Domain Event Payloads & Events ---
 
@@ -107,7 +107,7 @@ class DocumentRequirementDeterminedEventPayload(BaseModel):
 class DocumentRequirementDeterminedEvent(BaseEvent):
     event_type: str = "DocumentRequirementDetermined"
     payload: DocumentRequirementDeterminedEventPayload
-    payload_model_name: str = "DocumentRequirementDeterminedEventPayload"
+    payload_model_name: ClassVar[str] = "DocumentRequirementDeterminedEventPayload"
 
 class DocumentStatusUpdatedEventPayload(BaseModel):
     document_requirement_id: str
@@ -120,7 +120,7 @@ class DocumentStatusUpdatedEventPayload(BaseModel):
 class DocumentStatusUpdatedEvent(BaseEvent):
     event_type: str = "DocumentStatusUpdated"
     payload: DocumentStatusUpdatedEventPayload
-    payload_model_name: str = "DocumentStatusUpdatedEventPayload"
+    payload_model_name: ClassVar[str] = "DocumentStatusUpdatedEventPayload"
 
 # --- Notification Required Domain Event Payloads & Events ---
 
@@ -135,5 +135,5 @@ class NotificationRequiredEventPayload(BaseModel):
 class NotificationRequiredEvent(BaseEvent):
     event_type: str = "NotificationRequired" # Standardized event type name
     payload: NotificationRequiredEventPayload
-    payload_model_name: str = "NotificationRequiredEventPayload"
+    payload_model_name: ClassVar[str] = "NotificationRequiredEventPayload"
     # aggregate_id will typically be the case_id this notification pertains to.

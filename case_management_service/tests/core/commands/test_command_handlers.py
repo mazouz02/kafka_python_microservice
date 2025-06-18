@@ -6,9 +6,9 @@ import uuid
 import datetime
 
 # Modules to test and their new locations
-from case_management_service.core.commands import models as commands
-from case_management_service.core.commands import handlers as command_handlers
-from case_management_service.core.events import models as domain_events
+from case_management_service.app.service.commands import models as commands
+from case_management_service.app.service.commands import handlers as command_handlers
+from case_management_service.app.service.events import models as domain_events
 from case_management_service.infrastructure.kafka.schemas import PersonData, CompanyProfileData, BeneficialOwnerData, AddressData
 from case_management_service.infrastructure.database import schemas as db_schemas
 # New imports for notification logic testing
@@ -19,12 +19,12 @@ from case_management_service.app.config import settings
 
 class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
 
-    @patch('case_management_service.core.commands.handlers.dispatch_event_to_projectors', new_callable=AsyncMock)
-    @patch('case_management_service.core.commands.handlers.save_event', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.dispatch_event_to_projectors', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.save_event', new_callable=AsyncMock)
     # Add mocks for notification related calls, even if not used in this specific old test,
     # to ensure handler doesn't break if they are called with None or default.
-    @patch('case_management_service.core.commands.handlers.get_notification_config', new_callable=AsyncMock, return_value=None) # Default no rule
-    @patch('case_management_service.core.commands.handlers.get_kafka_producer') # Mock get_kafka_producer
+    @patch('case_management_service.app.service.commands.handlers.get_notification_config', new_callable=AsyncMock, return_value=None) # Default no rule
+    @patch('case_management_service.app.service.commands.handlers.get_kafka_producer') # Mock get_kafka_producer
     async def test_handle_create_case_command_success(
         self, mock_get_kafka_producer, mock_get_notification_config, mock_save_event, mock_dispatch_projectors
     ):
@@ -75,10 +75,10 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(mock_dispatch_projectors.call_count, 3) # Only core events are dispatched locally
 
-    @patch('case_management_service.core.commands.handlers.get_kafka_producer')
-    @patch('case_management_service.core.commands.handlers.get_notification_config', new_callable=AsyncMock)
-    @patch('case_management_service.core.commands.handlers.dispatch_event_to_projectors', new_callable=AsyncMock)
-    @patch('case_management_service.core.commands.handlers.save_event', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.get_kafka_producer')
+    @patch('case_management_service.app.service.commands.handlers.get_notification_config', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.dispatch_event_to_projectors', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.save_event', new_callable=AsyncMock)
     async def test_handle_create_case_command_kyb_sends_notification_if_configured(
         self, mock_save_event, mock_dispatch_projectors, mock_get_notification_config, mock_get_kafka_producer
     ):
@@ -161,9 +161,9 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_dispatch_projectors.call_count, 2)
 
 
-    @patch('case_management_service.core.commands.handlers.get_kafka_producer')
-    @patch('case_management_service.core.commands.handlers.get_notification_config', new_callable=AsyncMock)
-    @patch('case_management_service.core.commands.handlers.save_event', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.get_kafka_producer')
+    @patch('case_management_service.app.service.commands.handlers.get_notification_config', new_callable=AsyncMock)
+    @patch('case_management_service.app.service.commands.handlers.save_event', new_callable=AsyncMock)
     async def test_handle_create_case_command_no_notification_if_rule_inactive(
         self, mock_save_event, mock_get_notification_config, mock_get_kafka_producer
     ):

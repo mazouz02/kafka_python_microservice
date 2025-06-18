@@ -1,5 +1,5 @@
 # Pydantic models for Kafka message structures
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator, model_validator, Field
 from typing import List, Optional
 
 # New reusable Address model
@@ -50,40 +50,44 @@ class KafkaMessage(BaseModel):
     company_profile: Optional[CompanyProfileData] = None
     beneficial_owners: Optional[List[BeneficialOwnerData]] = Field(default_factory=list) # Default to empty list
 
-    @validator('version')
-    def version_must_be_valid(cls, v):
+    @field_validator('version')
+    @classmethod
+    def version_must_be_valid(cls, v: str) -> str:
         if v != "1.0": # Example validation, can be expanded
             raise ValueError('Version must be 1.0 for this schema processing')
         return v
 
-    @validator('traitement_type')
-    def traitement_type_must_be_valid(cls, v):
+    @field_validator('traitement_type')
+    @classmethod
+    def traitement_type_must_be_valid(cls, v: str) -> str:
         if v.upper() not in ["KYC", "KYB"]:
             raise ValueError('traitement_type must be either KYC or KYB')
         return v.upper()
 
-    @validator('company_profile', always=True)
-    def company_profile_required_for_kyb(cls, v, values):
-        # 'values' is a dict of already validated fields
-        traitement = values.get('traitement_type')
-        if traitement == "KYB" and v is None:
+    @model_validator(mode='after')
+    def check_dependencies_after_validation(self) -> 'KafkaMessage':
+        # Company Profile Check (formerly company_profile_required_for_kyb)
+        if self.traitement_type == "KYB" and self.company_profile is None:
             raise ValueError('company_profile is required when traitement_type is KYB')
-        if traitement == "KYC" and v is not None:
-            # Decide: allow company profile for KYC or raise error? For now, let's allow but it might be ignored.
-            # Or raise ValueError('company_profile should not be provided when traitement_type is KYC')
-            pass # Allowing company_profile for KYC, consumer logic might ignore it.
-        return v
 
-    @validator('beneficial_owners', always=True)
-    def beneficial_owners_for_kyb(cls, v, values): # v is the list of beneficial_owners
-        traitement = values.get('traitement_type')
-        if traitement == "KYC":
-            # For KYC, beneficial_owners list should be empty or None.
-            # The field defaults to an empty list, so `v` will be `[]` if not provided.
-            # If it's explicitly provided as `None`, that's also fine.
-            # If it's provided as a populated list, that's an error.
-            if v and any(v): # Checks if list is not None and not empty
-                 raise ValueError('beneficial_owners should not be provided or be empty when traitement_type is KYC')
-        # For KYB, it can be None or a list (empty or populated).
-        # The default_factory=list ensures 'v' is at least an empty list if not provided.
-        return v
+        # Original logic for KYC and company_profile:
+        # if self.traitement_type == "KYC" and self.company_profile is not None:
+        #     pass # Allowing company_profile for KYC, consumer logic might ignore it.
+        # This part of the original validator implies no action if KYC and company_profile is present.
+        # If it should be an error, it would need to be:
+        # if self.traitement_type == "KYC" and self.company_profile is not None:
+        #     raise ValueError('company_profile should not be provided when traitement_type is KYC')
+
+
+        # Beneficial Owners Check (formerly beneficial_owners_for_kyb)
+        if self.traitement_type == "KYC":
+            # If beneficial_owners is provided and not an empty list for KYC, it's an error.
+            # self.beneficial_owners will be at least [] due to default_factory=list
+            if self.beneficial_owners and any(self.beneficial_owners):
+                 raise ValueError('beneficial_owners should be empty or not provided when traitement_type is KYC')
+
+        # For KYB, beneficial_owners can be None or a list (empty or populated).
+        # The default_factory=list ensures it's an empty list if not provided,
+        # so no specific validation for KYB regarding presence is strictly needed here unless rules change.
+
+        return self

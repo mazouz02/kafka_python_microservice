@@ -63,8 +63,8 @@ async def shutdown_event():
     logger.info("MongoDB connection closed.")
 
 # Instrument FastAPI app (after app created, before routes included is also fine)
-FastAPIInstrumentor.instrument_app(app)
-logger.info("FastAPI instrumentation complete.")
+FastAPIInstrumentor.instrument_app(app) # Temporarily commented out for debugging
+logger.info("FastAPI instrumentation complete.") # Temporarily commented out for debugging
 
 # Include API Routers
 app.include_router(health_router.router)

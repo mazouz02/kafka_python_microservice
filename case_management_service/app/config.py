@@ -25,12 +25,11 @@ class AppSettings(BaseSettings):
     # Kafka Topic for Notifications
     NOTIFICATION_KAFKA_TOPIC: str = "notification_events"
 
-
-    class Config:
-        # Optional: if you have a .env file for local development
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore" # Ignore extra fields from .env
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
 # Instantiate settings to be imported by other modules
 settings = AppSettings()
