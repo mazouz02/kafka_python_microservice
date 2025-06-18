@@ -6,7 +6,7 @@ from typing import List, Optional
 from .connection import get_database
 from .schemas import StoredEventDB
 # Explicitly import event and payload models
-from case_management_service.app.service.events.models import (
+from case_management_service.app.models.events.models import (
     BaseEvent, EventMetaData, # Base types
     CaseCreatedEvent, CaseCreatedEventPayload,
     CompanyProfileCreatedEvent, CompanyProfileCreatedEventPayload,

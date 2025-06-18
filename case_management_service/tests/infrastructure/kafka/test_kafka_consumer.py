@@ -8,7 +8,7 @@ from confluent_kafka import Message, KafkaError # Using original confluent_kafka
 # Modules to test or support testing - new locations
 from case_management_service.infrastructure.kafka import consumer as kafka_consumer_module # The module to test
 from case_management_service.infrastructure.kafka.schemas import KafkaMessage # For verifying dispatched command data
-from case_management_service.app.service.commands.models import CreateCaseCommand # For verifying dispatched command data
+from case_management_service.app.models.commands.models import CreateCaseCommand # For verifying dispatched command data
 from opentelemetry.trace.status import Status, StatusCode # For checking span status
 
 

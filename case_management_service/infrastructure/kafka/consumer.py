@@ -13,7 +13,7 @@ from opentelemetry.trace.status import StatusCode, Status
 # Corrected imports based on new structure
 from case_management_service.app.config import settings
 from .schemas import KafkaMessage
-from case_management_service.app.service.commands.models import CreateCaseCommand
+from case_management_service.app.models.commands.models import CreateCaseCommand
 from case_management_service.app.service.commands.handlers import handle_create_case_command
 # Import the new histogram along with other observability components
 from case_management_service.app.observability import (
