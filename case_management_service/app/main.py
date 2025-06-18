@@ -1,6 +1,7 @@
 # FastAPI Application Entry Point (Refactored with API Routers)
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request # Added Request for app.state access in get_http_client
+import httpx # Added httpx
 
 # Configuration and Observability
 from case_management_service.app.config import settings
@@ -12,9 +13,10 @@ setup_opentelemetry(service_name=settings.SERVICE_NAME_API)
 # Import instrumentors after OTel SDK is initialized
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor # Added httpx instrumentor
 
 # Database connection
-from case_management_service.infrastructure.database.connection import connect_to_mongo, close_mongo_connection, get_database
+from case_management_service.infrastructure.database.connection import connect_to_mongo, close_mongo_connection, get_db
 # Kafka Producer lifecycle
 from case_management_service.infrastructure.kafka.producer import startup_kafka_producer, shutdown_kafka_producer
 
@@ -38,9 +40,29 @@ app = FastAPI(
 async def startup_event():
     logger.info("FastAPI application startup (with routers)...")
     try:
+        # Setup HTTP client
+        app.state.http_client = httpx.AsyncClient(timeout=settings.DEFAULT_HTTP_TIMEOUT)
+        HTTPXClientInstrumentor().instrument() # Instrument httpx client
+        logger.info(f"HTTPX AsyncClient initialized with timeout {settings.DEFAULT_HTTP_TIMEOUT} and instrumented.")
+
         connect_to_mongo()
-        await get_database()
-        logger.info("MongoDB connection established.")
+        # get_db() is an async generator, so we need to iterate it or use `async with`
+        # For startup, just ensuring the connection is made by connect_to_mongo and db is set is enough.
+        # If we needed the db object itself here, we'd do: `async for _db in get_db(): pass` (or similar)
+        # However, connect_to_mongo() already sets the global db variable.
+        # A direct call to `await get_db()` like `await get_database()` previously,
+        # if get_db() was a simple async func, would be fine.
+        # Since get_db() is now an async generator for FastAPI's Depends,
+        # we can call it and iterate once to ensure it runs its course if needed,
+        # but connect_to_mongo() should suffice for initializing the global `db` instance.
+        # Let's confirm connect_to_mongo populates the global 'db' that get_db() yields.
+        # The `get_db` function itself will call `connect_to_mongo` if db is None.
+        # So, simply calling connect_to_mongo here is sufficient.
+        # The previous `await get_database()` call was to ensure the connection was truly up.
+        # We can achieve a similar check by trying to get the db instance via the generator.
+        async for _ in get_db(): # Iterate once to ensure get_db logic (including connect_to_mongo if needed) runs
+            break
+        logger.info("MongoDB connection established via get_db call.")
 
         PymongoInstrumentor().instrument()
         logger.info("PyMongo instrumentation complete.")
@@ -55,6 +77,10 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("FastAPI application shutdown...")
+
+    if hasattr(app.state, 'http_client') and app.state.http_client:
+        await app.state.http_client.aclose()
+        logger.info("HTTPX AsyncClient closed.")
 
     await shutdown_kafka_producer() # Stop Kafka producer polling and flush
     logger.info("Kafka Producer shutdown initiated and flushed.")
