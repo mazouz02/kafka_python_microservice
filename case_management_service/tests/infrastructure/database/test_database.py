@@ -8,13 +8,10 @@ import uuid
 # Modules to test - new locations
 from case_management_service.infrastructure.database import connection as db_connection
 from case_management_service.infrastructure.database import event_store as db_event_store
-from case_management_service.infrastructure.database import read_models as db_read_models
-from case_management_service.infrastructure.database import raw_event_store as db_raw_event_store
-# Import the new store module
-from case_management_service.infrastructure.database import document_requirements_store as db_doc_req_store
+# Removed: read_models, raw_event_store, document_requirements_store imports as their tests are now separate
 # Updated schema import to include all necessary schemas
-from case_management_service.infrastructure.database import schemas as db_schemas
-from case_management_service.app.service.events import models as domain_event_models
+from case_management_service.infrastructure.database import schemas as db_schemas # Keep for schema tests
+from case_management_service.app.service.events import models as domain_event_models # Keep for event_store tests
 # Import ConcurrencyConflictError for testing
 from case_management_service.app.service.exceptions import ConcurrencyConflictError
 from case_management_service.app import config
@@ -214,45 +211,10 @@ def test_required_document_db_schema_instantiation():
     assert doc_req.status == "AWAITING_UPLOAD"
     assert doc_req.is_required is True
 
-# Tests for New Read Model Operations
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.read_models.get_database')
-async def test_upsert_company_read_model(mock_get_db_for_read_models):
-    mock_db_instance = AsyncMock()
-    mock_db_instance.companies.replace_one = AsyncMock()
-    mock_get_db_for_read_models.return_value = mock_db_instance
+# Removed tests for read_models, raw_event_store, and document_requirements_store
+# as they are now in their specific test files.
 
-    addr = AddressData(street="Test St", city="Test City", country="TC", postal_code="TS1")
-    company_data = db_schemas.CompanyProfileDB(
-        id="comp001", registered_name="Comp Name", registration_number="R001",
-        country_of_incorporation="TC", registered_address=addr
-    )
-    await db_read_models.upsert_company_read_model(company_data)
-
-    mock_db_instance.companies.replace_one.assert_called_once()
-    filter_arg = mock_db_instance.companies.replace_one.call_args.args[0]
-    doc_arg = mock_db_instance.companies.replace_one.call_args.args[1]
-    assert filter_arg == {"id": "comp001"}
-    assert doc_arg["registered_name"] == "Comp Name"
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.read_models.get_database')
-async def test_upsert_beneficial_owner_read_model(mock_get_db_for_read_models):
-    mock_db_instance = AsyncMock()
-    mock_db_instance.beneficial_owners.replace_one = AsyncMock()
-    mock_get_db_for_read_models.return_value = mock_db_instance
-
-    bo_data = db_schemas.BeneficialOwnerDB(
-        id="bo001", company_id="comp001", firstname="BoName", lastname="BoLast"
-    )
-    await db_read_models.upsert_beneficial_owner_read_model(bo_data)
-
-    mock_db_instance.beneficial_owners.replace_one.assert_called_once()
-    filter_arg = mock_db_instance.beneficial_owners.replace_one.call_args.args[0]
-    doc_arg = mock_db_instance.beneficial_owners.replace_one.call_args.args[1]
-    assert filter_arg == {"id": "bo001"}
-    assert doc_arg["firstname"] == "BoName"
-
+# Kept event_store tests and schema instantiation tests.
 @pytest.mark.asyncio
 @patch('case_management_service.infrastructure.database.event_store.get_database')
 async def test_get_events_for_aggregate_with_new_event_types(mock_get_db_for_event_store):
@@ -313,165 +275,3 @@ async def test_get_events_for_aggregate_with_new_event_types(mock_get_db_for_eve
     assert retrieved_events_company[1].payload.person_details.firstname == "BO"
     assert isinstance(retrieved_events_company[2], domain_event_models.PersonLinkedToCompanyEvent)
     assert retrieved_events_company[2].payload.role_in_company == "Director"
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.read_models.get_database')
-async def test_get_case_by_id_from_read_model(mock_get_db_for_read_models):
-    mock_db_instance = AsyncMock()
-    now = datetime.datetime.now(datetime.UTC)
-    case_doc_from_db = {"id": "foundcase", "client_id": "c1", "version": "v1", "type": "t1",
-                        "traitement_type": "KYC", "status": "OPEN",
-                        "created_at": now, "updated_at": now}
-    mock_db_instance.cases.find_one = AsyncMock(return_value=case_doc_from_db)
-    mock_get_db_for_read_models.return_value = mock_db_instance
-
-    result = await db_read_models.get_case_by_id_from_read_model("foundcase")
-    assert isinstance(result, db_schemas.CaseManagementDB)
-    assert result.id == "foundcase"
-
-    mock_db_instance.cases.find_one = AsyncMock(return_value=None)
-    result_none = await db_read_models.get_case_by_id_from_read_model("notfoundcase")
-    assert result_none is None
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.raw_event_store.get_database')
-async def test_add_raw_event_to_store(mock_get_db_for_raw_store):
-    mock_db_instance = AsyncMock()
-    mock_db_instance.raw_events.insert_one = AsyncMock()
-    mock_get_db_for_raw_store.return_value = mock_db_instance
-
-    raw_payload = {"key": "value"}
-    event_type = "RAW_TEST_EVENT"
-
-    returned_event = await db_raw_event_store.add_raw_event_to_store(raw_payload, event_type)
-
-    assert isinstance(returned_event, db_schemas.RawEventDB)
-    assert returned_event.payload == raw_payload
-    assert returned_event.event_type == event_type
-    mock_db_instance.raw_events.insert_one.assert_called_once()
-    inserted_doc = mock_db_instance.raw_events.insert_one.call_args.args[0]
-    assert inserted_doc["payload"] == raw_payload
-
-# --- Tests for infrastructure.database.document_requirements_store ---
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
-async def test_add_required_document(mock_get_db):
-    mock_db_instance = AsyncMock()
-    mock_collection = AsyncMock() # Specific mock for the collection
-    mock_db_instance.__getitem__.return_value = mock_collection
-    mock_collection.insert_one = AsyncMock()
-    mock_get_db.return_value = mock_db_instance
-
-    doc_req_data = db_schemas.RequiredDocumentDB(
-        case_id="case1", entity_id="person1", entity_type="PERSON",
-        document_type="PASSPORT", is_required=True
-    )
-
-    result = await db_doc_req_store.add_required_document(doc_req_data)
-
-    assert result == doc_req_data
-    mock_collection.insert_one.assert_called_once()
-    inserted_doc_arg = mock_collection.insert_one.call_args.args[0]
-    assert inserted_doc_arg["id"] == doc_req_data.id
-    assert inserted_doc_arg["document_type"] == "PASSPORT"
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
-async def test_update_required_document_status_and_meta_success(mock_get_db):
-    mock_db_instance = AsyncMock()
-    mock_collection = AsyncMock()
-    mock_db_instance.__getitem__.return_value = mock_collection
-    doc_req_id = "doc_req_abc"
-    now = datetime.datetime.now(datetime.UTC)
-    updated_doc_from_db = {
-        "id": doc_req_id, "case_id": "c1", "entity_id": "e1", "entity_type": "PERSON",
-        "document_type": "ID_CARD", "status": "UPLOADED", "is_required": True,
-        "metadata": {"upload_ref": "ref123"}, "notes": ["Uploaded by user."],
-        "created_at": now, "updated_at": now
-    }
-    mock_collection.update_one.return_value = MagicMock(matched_count=1, modified_count=1)
-    mock_collection.find_one.return_value = updated_doc_from_db
-    mock_get_db.return_value = mock_db_instance
-
-    new_status = "UPLOADED"
-    metadata_changes = {"upload_ref": "ref123"}
-    notes_to_add = ["Uploaded by user."]
-
-    result = await db_doc_req_store.update_required_document_status_and_meta(
-        doc_req_id, new_status, metadata_update=metadata_changes, notes_to_add=notes_to_add
-    )
-
-    assert result is not None
-    assert result.id == doc_req_id
-    assert result.status == new_status
-    assert result.metadata == metadata_changes
-    assert "Uploaded by user." in result.notes
-
-    mock_collection.update_one.assert_called_once()
-    update_call_args = mock_collection.update_one.call_args.args[1]
-    assert "$set" in update_call_args
-    assert update_call_args["$set"]["status"] == new_status
-    assert update_call_args["$set"]["metadata"] == metadata_changes
-    assert "$push" in update_call_args
-    assert update_call_args["$push"]["notes"]["$each"][0] == "Uploaded by user."
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
-async def test_update_required_document_status_not_found(mock_get_db):
-    mock_db_instance = AsyncMock()
-    mock_collection = AsyncMock()
-    mock_db_instance.__getitem__.return_value = mock_collection
-    mock_collection.update_one.return_value = MagicMock(matched_count=0)
-    mock_get_db.return_value = mock_db_instance
-
-    result = await db_doc_req_store.update_required_document_status_and_meta("non_existent_id", "UPLOADED")
-    assert result is None
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
-async def test_get_required_document_by_id(mock_get_db):
-    mock_db_instance = AsyncMock()
-    mock_collection = AsyncMock()
-    mock_db_instance.__getitem__.return_value = mock_collection
-    doc_req_id = "doc_get_id"
-    now = datetime.datetime.now(datetime.UTC)
-    doc_from_db = { "id": doc_req_id, "case_id": "c1", "entity_id": "e1", "entity_type": "PERSON", "document_type": "PASSPORT", "status": "AWAITING_UPLOAD", "is_required": True, "created_at": now, "updated_at": now}
-
-    mock_collection.find_one.return_value = doc_from_db
-    mock_get_db.return_value = mock_db_instance
-    result_found = await db_doc_req_store.get_required_document_by_id(doc_req_id)
-    assert result_found is not None
-    assert result_found.id == doc_req_id
-
-    mock_collection.find_one.return_value = None
-    result_not_found = await db_doc_req_store.get_required_document_by_id("other_id")
-    assert result_not_found is None
-
-@pytest.mark.asyncio
-@patch('case_management_service.infrastructure.database.document_requirements_store.get_database')
-async def test_list_required_documents(mock_get_db):
-    mock_db_instance = AsyncMock()
-    mock_collection = AsyncMock() # Specific mock for the collection
-    mock_db_instance.__getitem__.return_value = mock_collection
-
-    now = datetime.datetime.now(datetime.UTC)
-    docs_from_db = [
-        { "id": "doc1", "case_id": "c1", "entity_id": "p1", "entity_type": "PERSON", "document_type": "PASSPORT", "status": "AWAITING_UPLOAD", "is_required": True, "created_at": now, "updated_at": now},
-        { "id": "doc2", "case_id": "c1", "entity_id": "p1", "entity_type": "PERSON", "document_type": "VISA", "status": "UPLOADED", "is_required": False, "created_at": now, "updated_at": now}
-    ]
-
-    mock_cursor_final = AsyncMock()
-    mock_cursor_final.to_list = AsyncMock(return_value=docs_from_db)
-    mock_fluent_cursor = MagicMock()
-    mock_fluent_cursor.sort.return_value = mock_cursor_final
-    mock_collection.find.return_value = mock_fluent_cursor # find on the specific collection mock
-    mock_get_db.return_value = mock_db_instance
-
-    results = await db_doc_req_store.list_required_documents(case_id="c1", entity_id="p1", status="AWAITING_UPLOAD", is_required=True)
-
-    assert len(results) == 2
-    mock_collection.find.assert_called_once_with(
-        {"case_id": "c1", "entity_id": "p1", "status": "AWAITING_UPLOAD", "is_required": True}
-    )
-    mock_fluent_cursor.sort.assert_called_once_with("created_at", 1)
-    mock_cursor_final.to_list.assert_called_once_with(length=None)
