@@ -37,6 +37,7 @@ opentelemetry-instrumentation-pymongo = {version = "^0.55b1", allow-prereleases 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 pytest-asyncio = "^0.21.0"
+pytest-cov = "*"
 flake8 = "^6.0.0"
 black = "^23.7.0"
 isort = "^5.12.0"
