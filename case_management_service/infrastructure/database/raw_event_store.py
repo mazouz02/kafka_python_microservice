@@ -3,7 +3,7 @@ import logging
 
 # Corrected imports
 from .connection import get_database
-from .schemas import RawEventDB
+from case_management_service.app.models import RawEventDB
 
 logger = logging.getLogger(__name__)
 

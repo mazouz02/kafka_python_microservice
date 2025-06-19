@@ -21,7 +21,7 @@ from case_management_service.app.service.commands.handlers import (
 # Infrastructure for mocking
 from case_management_service.infrastructure.kafka.producer import KafkaProducerService
 from case_management_service.app.service.interfaces.notification_config_client import AbstractNotificationConfigClient, NotificationRule
-from case_management_service.infrastructure.database.schemas import RequiredDocumentDB
+from case_management_service.app.models import RequiredDocumentDB
 
 # Custom Exceptions
 from case_management_service.app.service.exceptions import DocumentNotFoundError, KafkaProducerError, ConcurrencyConflictError

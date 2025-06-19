@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorCollection
 # Modules to test
 from case_management_service.infrastructure.database.event_store import save_event, get_events_for_aggregate, EVENT_STORE_COLLECTION
 from case_management_service.app.service.events.models import BaseEvent, EventMetaData, CaseCreatedEvent, CaseCreatedEventPayload
-from case_management_service.infrastructure.database.schemas import StoredEventDB
+from case_management_service.app.models import StoredEventDB
 
 # Custom Exceptions
 from case_management_service.app.service.exceptions import ConcurrencyConflictError

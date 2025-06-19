@@ -5,7 +5,7 @@ from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
 # Corrected imports: Add CompanyProfileDB and BeneficialOwnerDB
-from .schemas import CaseManagementDB, PersonDB, CompanyProfileDB, BeneficialOwnerDB # Added new schemas
+from case_management_service.app.models import CaseManagementDB, PersonDB, CompanyProfileDB, BeneficialOwnerDB # Added new schemas
 
 logger = logging.getLogger(__name__)
 
