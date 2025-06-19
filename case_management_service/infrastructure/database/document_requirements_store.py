@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
-from .schemas import RequiredDocumentDB # The DB schema for required documents
+from case_management_service.app.models import RequiredDocumentDB # The DB schema for required documents
 
 logger = logging.getLogger(__name__)
 DOCUMENT_REQUIREMENTS_COLLECTION = "document_requirements"

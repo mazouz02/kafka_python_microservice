@@ -4,7 +4,7 @@ from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase # Added for type hinting
 
 # Corrected imports
-from .schemas import StoredEventDB
+from case_management_service.app.models import StoredEventDB
 # Explicitly import event and payload models
 from case_management_service.app.service.events.models import ( # Updated import path
     BaseEvent, EventMetaData, # Base types

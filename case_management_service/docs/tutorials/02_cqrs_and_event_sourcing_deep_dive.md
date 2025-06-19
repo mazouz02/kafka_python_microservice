@@ -119,9 +119,9 @@ Let's see how these patterns are implemented in our project:
 ### c. Event Store
 
 *   **Implementation:** The Event Store is responsible for persisting and retrieving domain events. In our service, this logic is in `case_management_service/infrastructure/database/event_store.py`.
-*   **Storage Schema:** Events are stored in MongoDB in a collection (e.g., `domain_events`). The schema for stored events is `StoredEventDB` (from `infrastructure/database/schemas.py`), where the event's Pydantic payload is serialized to a dictionary.
+*   **Storage Schema:** Events are stored in MongoDB in a collection (e.g., `domain_events`). The schema for stored events is `StoredEventDB` (now imported from `case_management_service.app.models`), where the event's Pydantic payload is serialized to a dictionary.
     ```python
-    # From infrastructure/database/schemas.py
+    # Previously from infrastructure/database/schemas.py, now from app/models/stored_event_db.py
     class StoredEventDB(BaseModel):
         event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
         event_type: str
@@ -146,7 +146,7 @@ Let's see how these patterns are implemented in our project:
     *   Examples: `project_case_created`, `project_company_profile_created`.
 *   **Purpose:** They listen to specific domain events (via the `dispatch_event_to_projectors` mechanism, which is called by command handlers after events are saved).
 *   **Logic:** When a projector receives an event it's interested in, it updates one or more read models.
-    *   It transforms data from the event payload into the schema of the target read model (e.g., `CaseManagementDB`, `CompanyProfileDB` from `infrastructure/database/schemas.py`).
+    *   It transforms data from the event payload into the schema of the target read model (e.g., `CaseManagementDB`, `CompanyProfileDB` from `case_management_service.app.models`).
     *   It calls functions from `infrastructure/database/read_models.py` (or specific stores like `document_requirements_store.py`) to perform the actual database update (e.g., `upsert_case_read_model`).
     ```python
     # Simplified snippet from core/events/projectors.py
@@ -164,7 +164,7 @@ Let's see how these patterns are implemented in our project:
 
 ### e. Read Models
 
-*   **Definition:** Pydantic schemas for read models are in `case_management_service/infrastructure/database/schemas.py`.
+*   **Definition:** Pydantic schemas for read models are now in `case_management_service/app/models/`. You can import them like `from case_management_service.app.models import CaseManagementDB`.
     *   Examples: `CaseManagementDB`, `PersonDB`, `CompanyProfileDB`, `BeneficialOwnerDB`, `RequiredDocumentDB`.
 *   **Storage:** Stored in separate MongoDB collections, optimized for querying.
 *   **Access:**
